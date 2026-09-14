@@ -48,6 +48,9 @@ export function createPiCompletion(
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      await debug(
+        `classifier request: model=${req.model.id} system=${req.system.length}ch user=${req.user.length}ch`,
+      );
       const res = await fetchFn(`${baseUrl}/chat/completions`, {
         method: "POST",
         headers,
@@ -62,7 +65,9 @@ export function createPiCompletion(
           temperature: 0,
           // Reasoning models otherwise spend the whole output budget thinking
           // and return null content instead of the one JSON line we need.
-          ...(req.model.capabilities?.reasoning ? { reasoning: { effort: "minimal" } } : {}),
+          ...(req.model.capabilities?.reasoning
+            ? { reasoning: { effort: "minimal" }, include_reasoning: false }
+            : {}),
         }),
       });
       if (!res.ok) {

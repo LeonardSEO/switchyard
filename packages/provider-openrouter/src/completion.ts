@@ -38,7 +38,9 @@ export function createOpenRouterCompletion(
           ],
           max_tokens: req.maxOutputTokens,
           temperature: 0,
-          ...(req.model.capabilities?.reasoning ? { reasoning: { effort: "minimal" } } : {}),
+          ...(req.model.capabilities?.reasoning
+            ? { reasoning: { effort: "minimal" }, include_reasoning: false }
+            : {}),
         }),
       });
       if (!res.ok) throw new Error(`completion failed: ${res.status}`);

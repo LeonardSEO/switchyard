@@ -187,6 +187,17 @@ export interface ModelClassifierOptions {
   escalation?: "uncertain" | "always" | "never";
 }
 
+/**
+ * Cap on what leaves the machine. The classifier needs the shape of the task,
+ * not the pasted source, and an unbounded objective is an unbounded bill.
+ */
+export const MAX_OBJECTIVE_CHARS = 4000;
+
+export function truncateObjective(objective: string, max = MAX_OBJECTIVE_CHARS): string {
+  if (objective.length <= max) return objective;
+  return `${objective.slice(0, max)}\n[truncated]`;
+}
+
 const CLASSIFIER_SYSTEM = `You classify a coding task for a model router.
 Reply with JSON only: {"kind":<debug|refactor|summarize|extract|review|plan|code-change>,"complexity":<simple|moderate|complex>,"confidence":<0..1>}
 simple = mechanical, local, one file. moderate = multi-file feature or contained bug. complex = architecture, distributed systems, migration, ambiguous requirements.`;
@@ -259,8 +270,10 @@ export class ModelClassifier implements Classifier {
       const res = await this.opts.complete({
         model,
         system: CLASSIFIER_SYSTEM,
-        user: task.objective,
-        maxOutputTokens: 400,
+        user: truncateObjective(task.objective),
+        // Reasoning models, and providers that ignore reasoning controls, can
+        // burn a surprising number of tokens before the JSON line.
+        maxOutputTokens: 800,
       });
       const parsed = parseClassification(res.text);
       if (!parsed) return { ...base, degraded: true };
