@@ -31,7 +31,32 @@ async function writeJson(path: string, value: unknown): Promise<void> {
 export const paths = (home = process.env.HOME ?? ".") => ({
   cache: `${home}/.switchyard/classifier-cache.json`,
   latency: `${home}/.switchyard/classifier-latency.json`,
+  failures: `${home}/.switchyard/classifier-failures.json`,
 });
+
+/**
+ * Models that failed recently (404, no endpoints, provider down). Skipped for a
+ * day so a bad catalog entry cannot keep costing a round trip every turn.
+ */
+const FAILURE_TTL_MS = 24 * 60 * 60 * 1000;
+
+export async function loadFailures(
+  path = paths().failures,
+  now = Date.now(),
+): Promise<Record<string, number>> {
+  const all = await readJson<Record<string, number>>(path, {});
+  return Object.fromEntries(Object.entries(all).filter(([, at]) => now - at < FAILURE_TTL_MS));
+}
+
+export async function recordFailure(
+  modelId: string,
+  path = paths().failures,
+): Promise<Record<string, number>> {
+  const all = await readJson<Record<string, number>>(path, {});
+  all[modelId] = Date.now();
+  await writeJson(path, all);
+  return all;
+}
 
 /** Classification cache keyed by (prompt version, kind, normalised objective). */
 export async function loadCache(path = paths().cache): Promise<Record<string, Classification>> {

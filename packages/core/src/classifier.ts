@@ -121,6 +121,8 @@ export interface ClassifierFloors {
   latencyMs?: (model: ModelCapabilities) => number | undefined;
   /** Prefer a local model (Ollama, LM Studio): no network, nothing leaves the machine. */
   preferLocal?: boolean;
+  /** Skip models known to be unusable right now (404s, missing endpoints). */
+  avoid?: (model: ModelCapabilities) => boolean;
 }
 
 export const defaultClassifierFloors: ClassifierFloors = {
@@ -166,6 +168,7 @@ export function pickCheapestClassifier(
     if (!m.pricing.inputPer1M.known) continue;
     if ((m.maxContextTokens ?? 0) < floors.minContextTokens) continue;
     if (floors.denylist?.includes(m.id)) continue;
+    if (floors.avoid?.(m)) continue;
     if (!floors.allowFreeTier && m.freeTier) continue;
     if (!floors.allowBatch && m.batchOnly) continue;
     if (floors.requireStructuredOutput && m.capabilities?.structuredOutput !== true) continue;
@@ -183,19 +186,42 @@ export function pickCheapestClassifier(
   }
   if (eligible.length === 0) return undefined;
 
-  const maxLatency = floors.maxLatencyMs ?? Number.POSITIVE_INFINITY;
-  const withinBudget = eligible.filter((m) => {
-    const measured = floors.latencyMs?.(m);
-    return measured === undefined || measured <= maxLatency;
-  });
+  // Unmeasured is unknown, not free: it must never outrank a model we have
+  // actually timed, otherwise an unmeasured 7s model (or one OpenRouter does not
+  // even serve) beats a known 1.2s one, which is exactly backwards.
+  const measured = eligible.filter((m) => floors.latencyMs?.(m) !== undefined);
+  if (measured.length > 0) {
+    const maxLatency = floors.maxLatencyMs ?? Number.POSITIVE_INFINITY;
+    const withinBudget = measured.filter((m) => (floors.latencyMs?.(m) ?? 0) <= maxLatency);
+    const pool = withinBudget.length > 0 ? withinBudget : measured;
+    const key = (m: ModelCapabilities) =>
+      withinBudget.length > 0 ? price(m) : (floors.latencyMs?.(m) ?? Infinity);
+    return pool.reduce((best, m) => (key(m) < key(best) ? m : best));
+  }
+  return eligible.reduce((best, m) => (price(m) < price(best) ? m : best));
+}
 
-  const pool = withinBudget.length > 0 ? withinBudget : eligible;
-  const key = (m: ModelCapabilities) =>
-    withinBudget.length > 0
-      ? (m.pricing.inputPer1M.known ? m.pricing.inputPer1M.value : Infinity)
-      : (floors.latencyMs?.(m) ?? Number.POSITIVE_INFINITY);
+/** Ordered classifier candidates, so a failed call can fall through to the next. */
+export function rankClassifierCandidates(
+  models: ModelCapabilities[],
+  floors: ClassifierFloors = defaultClassifierFloors,
+  limit = 3,
+): ModelCapabilities[] {
+  const ranked: ModelCapabilities[] = [];
+  const pool = [...models];
+  while (ranked.length < limit) {
+    const next = pickCheapestClassifier(
+      pool.filter((m) => !ranked.some((r) => r.id === m.id)),
+      { ...floors, avoid: (m) => floors.avoid?.(m) ?? ranked.some((r) => r.id === m.id) },
+    );
+    if (!next) break;
+    ranked.push(next);
+  }
+  return ranked;
+}
 
-  return pool.reduce((best, m) => (key(m) < key(best) ? m : best));
+function price(m: ModelCapabilities): number {
+  return m.pricing.inputPer1M.known ? m.pricing.inputPer1M.value : Number.POSITIVE_INFINITY;
 }
 
 export interface ModelClassifierOptions {

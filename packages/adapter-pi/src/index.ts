@@ -4,6 +4,7 @@ import {
   ModelClassifier,
   defaultClassifierFloors,
   pickCheapestClassifier,
+  rankClassifierCandidates,
   route,
   ClassificationCache,
   type Classification,
@@ -18,7 +19,14 @@ import type { PiApiLike, PiContextLike, PiModelLike } from "./pi";
 import { matchPiModel } from "./pi";
 import { createPiCompletion } from "./completion";
 import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes";
-import { loadCache, loadLatencies, recordLatency, saveCache } from "./store";
+import {
+  loadCache,
+  loadFailures,
+  loadLatencies,
+  recordFailure,
+  recordLatency,
+  saveCache,
+} from "./store";
 
 export * from "./pi";
 export * from "./outcomes";
@@ -33,6 +41,8 @@ export interface AdapterOptions {
   cacheFile?: string;
   /** Classifier latency file; defaults to ~/.switchyard/classifier-latency.json */
   latencyFile?: string;
+  /** Failed-classifier file; defaults to ~/.switchyard/classifier-failures.json */
+  failureFile?: string;
   /** Tell the user what was chosen. Off in tests. */
   quiet?: boolean;
   /**
@@ -64,6 +74,11 @@ export function createExtension(opts: AdapterOptions = {}) {
     let snapshotPromise: Promise<Snapshot> | undefined;
     let availableCache: PiModelLike[] = [];
     let pending: PendingRun | undefined;
+    // Most sessions spend many turns on one task. Classifying the same task
+    // again every turn is the latency users actually feel, so the rung is
+    // reused while the objective is still recognisably the same task.
+    let lastObjective: string | undefined;
+    let lastClassification: Classification | undefined;
     let classifierPromise: Promise<Classifier> | undefined;
 
     /**
@@ -78,6 +93,7 @@ export function createExtension(opts: AdapterOptions = {}) {
             (m) => m.pricing.kind === "api" || m.pricing.kind === "local",
           );
           const latencies = await loadLatencies(opts.latencyFile);
+          const failed = await loadFailures(opts.failureFile);
           // Below ~0.5 the models guess rather than follow the schema, and the
           // rung they pick is what every other decision hangs on.
           const picked = pickCheapestClassifier(candidates, {
@@ -87,8 +103,20 @@ export function createExtension(opts: AdapterOptions = {}) {
             // itself switches reasoning off rather than excluding them.
             allowReasoning: true,
             latencyMs: (m) => latencies[m.id],
+            avoid: (m) => failed[m.id] !== undefined,
           });
           if (!picked) return new KeywordClassifier();
+          const backups = rankClassifierCandidates(
+            candidates,
+            {
+              ...defaultClassifierFloors,
+              minCapabilityScore: 0.5,
+              allowReasoning: true,
+              latencyMs: (m) => latencies[m.id],
+              avoid: (m) => failed[m.id] !== undefined,
+            },
+            3,
+          ).slice(1);
 
           const cache = new Map(Object.entries(await loadCache(opts.cacheFile)));
           const diskCache = {
@@ -103,7 +131,7 @@ export function createExtension(opts: AdapterOptions = {}) {
           return new ModelClassifier({
             models: candidates,
             cache: diskCache as never,
-            complete: timedCompletion(ctx, picked.id, opts.latencyFile),
+            complete: timedCompletion(ctx, picked, opts.latencyFile, backups, opts.failureFile),
             modelId: picked.id,
             // Measured on a held-out set: keyword 2/12, model 11/12. The rung
             // decides every other decision, so it is worth one round trip —
@@ -149,9 +177,16 @@ export function createExtension(opts: AdapterOptions = {}) {
       }
       if (routable.length === 0) return;
 
-      const classification = await getClassifier(ctx, snapshot).then((c) =>
-        c.classify({ objective }),
-      );
+      let classification: Classification;
+      const reuse =
+        lastClassification && lastObjective && taskSimilarity(lastObjective, objective) >= 0.3;
+      if (reuse && lastClassification) {
+        classification = { ...lastClassification, source: "model" };
+      } else {
+        classification = await getClassifier(ctx, snapshot).then((c) => c.classify({ objective }));
+        lastObjective = objective;
+        lastClassification = classification;
+      }
       const outcomes = await readOutcomes(opts.outcomeFile);
       const signals: Record<string, RoutingSignal> = {
         ...signalsFromCatalog(snapshot.models),
@@ -169,9 +204,12 @@ export function createExtension(opts: AdapterOptions = {}) {
         kind: decision.kind,
         complexity: decision.complexity,
         effort: decision.effort,
-        classifier: classification.degraded
-          ? `${classification.source}:degraded`
-          : classification.source,
+        classifier:
+          classification.degraded
+            ? `${classification.source}:degraded`
+            : reuse
+              ? `${classification.source}:reused`
+              : classification.source,
       };
 
       try {
@@ -216,6 +254,26 @@ export function createExtension(opts: AdapterOptions = {}) {
   };
 }
 
+/**
+ * Word-overlap between two objectives. Cheap, local, and good enough to tell
+ * "still working on the same thing" from "moved on to something else".
+ */
+export function taskSimilarity(a: string, b: string): number {
+  const words = (value: string) =>
+    new Set(
+      value
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .filter((w) => w.length > 3),
+    );
+  const left = words(a);
+  const right = words(b);
+  if (left.size === 0 || right.size === 0) return 0;
+  let shared = 0;
+  for (const word of left) if (right.has(word)) shared += 1;
+  return shared / (left.size + right.size - shared);
+}
+
 function routeSafely(
   objective: string,
   routable: ModelCapabilities[],
@@ -247,16 +305,27 @@ function routeSafely(
 /** Wraps the completion to record latency, so slow classifiers get replaced. */
 function timedCompletion(
   ctx: PiContextLike,
-  modelId: string,
+  primary: ModelCapabilities,
   latencyFile?: string,
+  backups: ModelCapabilities[] = [],
+  failureFile?: string,
 ): CompletionFn {
   const inner = createPiCompletion(ctx);
-  const started = () => Date.now();
   return async (req) => {
-    const t = started();
-    const res = await inner(req);
-    void recordLatency(modelId, Date.now() - t, latencyFile);
-    return res;
+    let lastError: unknown;
+    for (const model of [primary, ...backups]) {
+      const started = Date.now();
+      try {
+        const res = await inner({ ...req, model });
+        void recordLatency(model.id, Date.now() - started, latencyFile);
+        return res;
+      } catch (err) {
+        lastError = err;
+        void recordLatency(model.id, Date.now() - started, latencyFile);
+        void recordFailure(model.id, failureFile);
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error("classifier unavailable");
   };
 }
 

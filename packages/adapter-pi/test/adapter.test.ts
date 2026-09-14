@@ -132,8 +132,9 @@ describe("pi adapter", () => {
     createExtension({
       loadSnapshot: async () => snapshotOf([cheap, flash, sol]),
       outcomeFile: tempFile(),
-      cacheFile: tempFile(),
-      latencyFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
       quiet: true,
     })(pi);
 
@@ -152,8 +153,9 @@ describe("pi adapter", () => {
         },
       }),
       outcomeFile: tempFile(),
-      cacheFile: tempFile(),
-      latencyFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
       quiet: true,
     })(pi);
 
@@ -170,8 +172,9 @@ describe("pi adapter", () => {
     createExtension({
       loadSnapshot: async () => snapshotOf([cheap, flash]),
       outcomeFile: tempFile(),
-      cacheFile: tempFile(),
-      latencyFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
       quiet: true,
     })(pi);
     await handlers.before_agent_start!({ prompt: "rename a variable" }, ctx);
@@ -185,8 +188,9 @@ describe("pi adapter", () => {
         throw new Error("offline");
       },
       outcomeFile: tempFile(),
-      cacheFile: tempFile(),
-      latencyFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
       quiet: true,
     })(pi);
     await handlers.before_agent_start!({ prompt: "rename a variable" }, ctx);
@@ -199,8 +203,9 @@ describe("pi adapter", () => {
     createExtension({
       loadSnapshot: async () => snapshotOf([cheap, flash, sol]),
       outcomeFile: file,
-      cacheFile: tempFile(),
-      latencyFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
       quiet: true,
     })(pi);
 
@@ -275,6 +280,7 @@ describe("classifier escalation", () => {
         outcomeFile: tempFile(),
         cacheFile: tempFile(),
         latencyFile: tempFile(),
+        failureFile: tempFile(),
         quiet: true,
       })(pi);
       await handlers.before_agent_start!({ prompt: uncertain }, ctx);
@@ -302,6 +308,7 @@ describe("classifier escalation", () => {
         outcomeFile: tempFile(),
         cacheFile: tempFile(),
         latencyFile: tempFile(),
+        failureFile: tempFile(),
         quiet: true,
         escalation: "uncertain",
       })(pi);
@@ -332,6 +339,7 @@ describe("classifier escalation", () => {
         outcomeFile: tempFile(),
         cacheFile: tempFile(),
         latencyFile: tempFile(),
+        failureFile: tempFile(),
         quiet: false,
       })(pi);
       await handlers.before_agent_start!({ prompt: uncertain }, ctx);
@@ -370,6 +378,7 @@ describe("classifier call shape", () => {
         outcomeFile: tempFile(),
         cacheFile: tempFile(),
         latencyFile: tempFile(),
+        failureFile: tempFile(),
         quiet: true,
       })(pi);
       await handlers.before_agent_start!({ prompt: "implement service" }, ctx);
@@ -413,6 +422,7 @@ describe("escalation policy", () => {
         outcomeFile: tempFile(),
         cacheFile: tempFile(),
         latencyFile: tempFile(),
+        failureFile: tempFile(),
         quiet: true,
       })(pi);
       // Confident keyword answer (trivial), yet escalation is on by default.
@@ -422,5 +432,54 @@ describe("escalation policy", () => {
     }
     expect(called).toBe(1);
     expect(captured.body).toContain("cheap/classifier");
+  });
+});
+
+describe("task similarity", () => {
+  it("reuses the rung while the session stays on the same task", async () => {
+    const { ctx, captured } = fakeCtxWithAuth({ apiKey: "k", baseUrl: "https://example.test/v1" });
+    ctx.modelRegistry.getAvailable = () => [{ id: "cheap/classifier", provider: "openrouter" }];
+    const { pi, handlers } = fakePi([]);
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: '{"kind":"code-change","complexity":"advanced"}' } }],
+        }),
+      } as unknown as Response;
+    }) as typeof fetch;
+    try {
+      createExtension({
+        loadSnapshot: async () =>
+          snapshotOf([
+            classifierModel("cheap/classifier", 0.01, 0.55),
+            classifierModel("frontier/large", 3, 0.8, "large"),
+          ]),
+        outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
+        quiet: true,
+      })(pi);
+      await handlers.before_agent_start!(
+        { prompt: "Add OpenTelemetry tracing across the HTTP and worker layers" },
+        ctx,
+      );
+      await handlers.agent_end!({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+      // Same task, more detail: no second round trip.
+      await handlers.before_agent_start!(
+        { prompt: "Add OpenTelemetry tracing across the HTTP worker layers and tests" },
+        ctx,
+      );
+      await handlers.agent_end!({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    expect(calls).toBe(1);
+    expect(captured.body).toBeDefined();
   });
 });
