@@ -1,21 +1,48 @@
 {
   "name": "@vepando/switchyard-gateway",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "license": "Apache-2.0",
   "type": "module",
   "author": "LeonardSEO",
   "description": "OpenAI-compatible endpoint that routes each request to the right model",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
-  "bin": { "switchyard-gateway": "./dist/cli.js" },
-  "files": ["dist", "src", "README.md"],
-  "scripts": { "build": "tsc -p tsconfig.build.json", "prepare": "npm run build" },
-  "keywords": ["model-router", "openai-compatible", "gateway", "llm"],
-  "repository": { "type": "git", "url": "git+https://github.com/LeonardSEO/switchyard.git" },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "bin": {
+    "switchyard-gateway": "./bin/switchyard-gateway.js"
+  },
+  "files": [
+    "dist",
+    "src",
+    "bin",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "model-router",
+    "openai-compatible",
+    "gateway",
+    "llm"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeonardSEO/switchyard.git"
+  },
   "homepage": "https://github.com/LeonardSEO/switchyard#readme",
-  "engines": { "node": ">=20" },
-  "publishConfig": { "access": "public" },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "@vepando/switchyard-core": "^0.1.0",
     "@vepando/switchyard-catalog": "^0.1.0",
