@@ -294,7 +294,8 @@ describe("classifier", () => {
     });
     // A 200k-token context must not change what the classifier call costs.
     expect(huge).toBeCloseTo(small);
-    expect(small).toBeLessThan(0.00001);
+    // A short classification prompt, not a task with repository context.
+    expect(small).toBeLessThan(0.00005);
   });
 
   it("uses the model answer and caches it", async () => {

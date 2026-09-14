@@ -198,16 +198,58 @@ export function truncateObjective(objective: string, max = MAX_OBJECTIVE_CHARS):
   return `${objective.slice(0, max)}\n[truncated]`;
 }
 
-const CLASSIFIER_SYSTEM = `You classify a coding task for a model router.
-Reply with JSON only: {"kind":<debug|refactor|summarize|extract|review|plan|code-change>,"complexity":<simple|moderate|complex>,"confidence":<0..1>}
-simple = mechanical, local, one file. moderate = multi-file feature or contained bug. complex = architecture, distributed systems, migration, ambiguous requirements.`;
+/** Bump when the prompt changes: cached answers belong to the old prompt. */
+export const CLASSIFIER_PROMPT_VERSION = 2;
+
+export const COMPLEXITIES = [
+  "trivial",
+  "simple",
+  "moderate",
+  "advanced",
+  "complex",
+  "frontier",
+] as const;
+
+export const KINDS = [
+  "debug",
+  "refactor",
+  "summarize",
+  "extract",
+  "review",
+  "plan",
+  "code-change",
+] as const;
+
+const CLASSIFIER_SYSTEM = `You classify one coding task for a model router that decides which LLM runs it.
+
+Reply with JSON only. No prose, no markdown, no code fences.
+
+Complexity rungs (choose exactly one):
+- trivial: one mechanical edit in one place, no design decision (rename, reformat, add an import).
+- simple: small self-contained change in one file, the solution is obvious (add validation, tweak a helper).
+- moderate: multi-file feature, or a contained bug fix inside one component.
+- advanced: new subsystem or cross-cutting change needing design choices (an API with pagination and filtering, a refactor across modules).
+- complex: concurrency, distributed systems, data migration, cross-service debugging, or ambiguous requirements.
+- frontier: greenfield architecture, or rewriting a core system where most decisions are still open.
+
+If you are torn between two rungs, pick the higher one: a stronger model costs less than a failed attempt.
+
+Kind (choose exactly one): debug, refactor, summarize, extract, review, plan, code-change.
+
+Fields, in this order:
+{"kind":<kind>,"complexity":<rung>,"confidence":<0..1>,"why":"<=8 words"}
+
+Use only the values listed above. If the task is too vague to judge, use complexity "moderate" and confidence 0.3 or lower.`;
 
 export class ClassificationCache {
   private map = new Map<string, Classification>();
   constructor(private readonly maxEntries = 500) {}
 
   static key(task: TaskSpec): string {
-    return `${task.kind ?? ""}|${task.objective.trim().toLowerCase().replace(/\s+/g, " ")}`;
+    return `v${CLASSIFIER_PROMPT_VERSION}|${task.kind ?? ""}|${task.objective
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ")}`;
   }
 
   get(task: TaskSpec): Classification | undefined {
@@ -342,9 +384,17 @@ function parseClassification(text: string): {
   if (!match) return null;
   try {
     const obj = JSON.parse(match[0]) as Record<string, unknown>;
+    // Validate instead of casting: a hallucinated rung ("hard") would otherwise
+    // flow straight into the router and prune every capable model.
+    const kind = KINDS.includes(obj.kind as (typeof KINDS)[number])
+      ? (obj.kind as TaskKind)
+      : undefined;
+    const complexity = COMPLEXITIES.includes(obj.complexity as (typeof COMPLEXITIES)[number])
+      ? (obj.complexity as Complexity)
+      : undefined;
     return {
-      kind: obj.kind as TaskKind | undefined,
-      complexity: obj.complexity as Complexity | undefined,
+      kind,
+      complexity,
       confidence: typeof obj.confidence === "number" ? obj.confidence : undefined,
     };
   } catch {
