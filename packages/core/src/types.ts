@@ -97,6 +97,8 @@ export interface ModelCapabilities {
   };
   /** Free or rate-limited variant: the price is a known zero, capacity is not. */
   freeTier?: boolean;
+  /** Asynchronous batch endpoint: cheap and capable, useless interactively. */
+  batchOnly?: boolean;
   /**
    * 0..1, default 1. Probability-ish weight for "this call will just work".
    * Rate-limited free tiers, flaky endpoints and unmeasured capacity score
@@ -148,5 +150,7 @@ export interface TaskSpec {
   maxCostUsd?: number;
   /** Models already tried in an interrupted run. */
   skipModels?: string[];
+  /** Allow asynchronous batch endpoints. Off by default: coding agents wait. */
+  allowBatch?: boolean;
   session?: SessionContext;
 }

@@ -22,6 +22,7 @@ const api = (id: string, tier: string, inUsd: number, outUsd: number): ModelCapa
   tier: tier as ModelCapabilities["tier"],
   maxContextTokens: 200_000,
   supportsTools: ["bash", "read", "write", "edit"],
+  capabilities: { structuredOutput: true, toolCalling: true },
   pricing: {
     kind: "api",
     inputPer1M: { known: true, value: inUsd },
@@ -175,6 +176,14 @@ describe("classifier", () => {
 
   it("picks the cheapest API model, never a subscription or unknown price", () => {
     expect(pickCheapestClassifier([...models, luna])?.id).toBe("micro");
+  });
+
+  it("refuses :free and :batch models and models that cannot return JSON", () => {
+    const free = { ...api("free", "small", 0, 0), freeTier: true };
+    const batch = { ...api("b:batch", "small", 0.001, 0.002), batchOnly: true };
+    const noJson = { ...api("nojson", "small", 0.001, 0.002), capabilities: { structuredOutput: false } };
+    const good = api("good", "small", 0.05, 0.1);
+    expect(pickCheapestClassifier([free, batch, noJson, good])?.id).toBe("good");
   });
 
   it("does not call a model when the deterministic answer is confident", async () => {

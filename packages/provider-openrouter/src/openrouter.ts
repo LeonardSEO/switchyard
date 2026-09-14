@@ -96,6 +96,7 @@ export function mapOpenRouterModel(raw: OpenRouterModel): ModelCapabilities {
     strengths,
     weaknesses,
     freeTier: freeTier || undefined,
+    batchOnly: raw.id.endsWith(":batch") || undefined,
     // Free variants are rate-limited by design: they lose to a reliable paid
     // model of equal capability once the retry tax is priced in.
     reliability: freeTier ? FREE_TIER_RELIABILITY : undefined,

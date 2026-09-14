@@ -60,6 +60,8 @@ function rejectionReason(
   if (capacityBlocked(ctx.capacity?.[m.id], nowMs)) {
     return "capacity unavailable";
   }
+  // Batch endpoints answer hours later, not in the middle of a coding session.
+  if (m.batchOnly && !task.allowBatch) return "async batch endpoint";
   if (m.weaknesses?.includes(kind)) return `weakness: ${kind}`;
 
   const needed = task.contextTokens ?? 0;

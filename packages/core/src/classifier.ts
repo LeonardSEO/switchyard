@@ -97,15 +97,25 @@ export interface ClassifierFloors {
   /** Reject models known to be too weak to follow a JSON schema. */
   minTier?: "small" | "mid" | "large";
   denylist?: string[];
+  /** The classifier must return parseable JSON. */
+  requireStructuredOutput?: boolean;
+  /** A classifier that is rate-limited or answers hours later is no use. */
+  allowFreeTier?: boolean;
+  allowBatch?: boolean;
 }
 
 export const defaultClassifierFloors: ClassifierFloors = {
   minContextTokens: 16_000,
+  requireStructuredOutput: true,
+  allowFreeTier: false,
+  allowBatch: false,
 };
 
 /**
- * Cheapest API model that can follow a schema. Recomputed from the live
- * catalog: hardcoding today's cheapest model is a maintenance trap.
+ * Cheapest model that can actually do the job: follows a schema, answers now,
+ * is not rate-limited to nothing. Recomputed from the live catalog — hardcoding
+ * "use deepseek-v4-flash" is a maintenance trap, and picking the raw cheapest
+ * row picks a `:free` or `:batch` endpoint that cannot serve a classification.
  */
 export function pickCheapestClassifier(
   models: ModelCapabilities[],
@@ -120,7 +130,9 @@ export function pickCheapestClassifier(
     if (!m.pricing.inputPer1M.known) continue;
     if ((m.maxContextTokens ?? 0) < floors.minContextTokens) continue;
     if (floors.denylist?.includes(m.id)) continue;
-    if ((m.supportsTools?.length ?? 0) === 0) continue;
+    if (!floors.allowFreeTier && m.freeTier) continue;
+    if (!floors.allowBatch && m.batchOnly) continue;
+    if (floors.requireStructuredOutput && m.capabilities?.structuredOutput !== true) continue;
     if (tierRank[m.tier] < minTier) continue;
     const price = m.pricing.inputPer1M.known ? m.pricing.inputPer1M.value : Infinity;
     if (price < bestPrice) {
