@@ -57,7 +57,24 @@ export interface AdapterOptions {
    * offline or private use where no objective should leave the machine.
    */
   escalation?: "always" | "uncertain" | "never";
+  /**
+   * Word-overlap above which the previous task's classification is reused for
+   * this turn. Below the threshold the classifier runs again — one cheap, cached
+   * call that decides which rung (and thus which price band) the turn routes to.
+   * The default is deliberately strict: reusing a rung across dissimilar turns
+   * is how a rename inherits "moderate" from the refactor before it and keeps
+   * riding the same model. Set it lower to trade a little latency for accuracy.
+   */
+  reuseSimilarity?: number;
 }
+
+/**
+ * Classification reuse threshold. 0.3 was too permissive: coding turns share
+ * enough function words to clear it by accident, so a moderate refactor's rung
+ * stuck onto the next rename and the router kept sitting on the same model.
+ * 0.6 still recognizes "still working on the same thing" without stretching it.
+ */
+export const DEFAULT_REUSE_SIMILARITY = 0.6;
 
 interface PendingRun {
   modelId: string;
@@ -126,7 +143,9 @@ export function createExtension(opts: AdapterOptions = {}) {
               latencyMs: (m) => latencies[m.id],
               avoid: (m) => failed[m.id] !== undefined,
             },
-            3,
+            // Five model candidates before a degraded keyword answer: a dead
+            // catalog entry must cost one round trip, not give up the rung.
+            5,
           ).slice(1);
 
           const cache = new Map(Object.entries(await loadCache(opts.cacheFile)));
@@ -189,8 +208,9 @@ export function createExtension(opts: AdapterOptions = {}) {
       if (routable.length === 0) return;
 
       let classification: Classification;
+      const threshold = opts.reuseSimilarity ?? DEFAULT_REUSE_SIMILARITY;
       const reuse =
-        lastClassification && lastObjective && taskSimilarity(lastObjective, objective) >= 0.3;
+        lastClassification && lastObjective && taskSimilarity(lastObjective, objective) >= threshold;
       if (reuse && lastClassification) {
         classification = { ...lastClassification, source: "model" };
       } else {

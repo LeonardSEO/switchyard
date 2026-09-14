@@ -40,6 +40,10 @@ Everything is optional.
   and private use.
 - `classifierModel: "<id>"` — pin the classifier instead of letting price,
   benchmark and measured latency decide.
+- `reuseSimilarity` — word-overlap (0..1) above which the previous task's rung
+  is reused. Default 0.6: strict, so a rename is classified as its own task and
+  can drop to a cheaper model instead of inheriting the previous rung. Lower it
+  to run the classifier less; raise it to run it on nearly every turn.
 - `failureCostByRisk` — what a failed attempt costs you, per risk level.
 - `outcomeFile`, `cacheFile` — custom paths for the outcome log and
   classification cache (defaults live under `~/.switchyard/`).

@@ -84,7 +84,7 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
       minCapabilityScore: 0.5,
       allowReasoning: true,
     };
-    const ranked = rankClassifierCandidates(api, floors, 3);
+    const ranked = rankClassifierCandidates(api, floors, 5);
     const picked = ranked[0];
     const transport = createOpenRouterCompletion({ apiKey: opts.apiKey });
     // Fall through to the next candidate on failure: one dead catalog entry

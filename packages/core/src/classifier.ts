@@ -133,10 +133,12 @@ export const defaultClassifierFloors: ClassifierFloors = {
   allowReasoning: false,
   requireBenchmark: true,
   minCapabilityScore: 0.2,
-  // A ~2s classification is acceptable; churn is not. A tighter budget makes the
+  // A ~2.5s classification is acceptable; churn is not. A tighter budget makes the
   // selection flip between models every few turns, and each flip is paid for
-  // with a slow call to an unmeasured one.
-  maxLatencyMs: 2000,
+  // with a slow call to an unmeasured one. Measured on a real catalog: the
+  // fastest capable classifiers sit between 1s and 2.3s, so 2000ms sat under
+  // the measured ceiling and pushed working models out of the primary slot.
+  maxLatencyMs: 2500,
   preferLocal: true,
 };
 
@@ -240,11 +242,12 @@ export interface ModelClassifierOptions {
   /** Overrides automatic cheapest-model selection. */
   modelId?: string;
   /**
-   * When to spend a call. "uncertain" (default) only asks when the keyword
-   * score sits near a threshold; "always" asks for every task, which is right
-   * when the rung is worth more than the latency; "never" is offline mode.
+   * When to spend a call. "always" (default) asks a cheap model for every
+   * task — the rung it picks is what every other decision hangs on, and it
+   * measured 11/12 against the keyword rules' 2/12. "uncertain" only asks when
+   * the deterministic score sits near a threshold; "never" is offline mode.
    */
-  escalation?: "uncertain" | "always" | "never";
+  escalation?: "always" | "uncertain" | "never";
 }
 
 /**
@@ -346,7 +349,7 @@ export class ModelClassifier implements Classifier {
     if (cached) return cached;
 
     if (this.opts.escalation === "never") return base;
-    if (this.opts.escalation !== "always" && !isUncertain(base)) return base;
+    if (this.opts.escalation === "uncertain" && !isUncertain(base)) return base;
 
     const model =
       this.opts.models.find((m) => m.id === this.opts.modelId) ??
