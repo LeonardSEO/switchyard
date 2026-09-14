@@ -43,12 +43,18 @@ export interface PiContextLike {
   ui?: { notify?(message: string, level?: string): void };
 }
 
+export interface PiCommandLike {
+  description?: string;
+  handler(args: string, ctx: PiContextLike): Promise<void>;
+}
+
 export interface PiApiLike {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   on(event: string, handler: (event: any, ctx: PiContextLike) => unknown): void;
   setModel(model: PiModelLike): Promise<boolean> | boolean;
   setThinkingLevel(level: string): void | Promise<void>;
   getThinkingLevel?(): string;
+  registerCommand?(name: string, command: PiCommandLike): void;
 }
 
 /**

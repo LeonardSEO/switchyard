@@ -16,6 +16,10 @@ Switchyard routes each coding task to a capable model without spending frontier-
 pi install npm:@vepando/switchyard
 ```
 
+Run `/switchyard-clear-cache` in Pi whenever you want to remove saved task
+classifications. The next matching task will be classified again; model choices
+are never stored in this cache.
+
 ### OpenCode
 
 ```bash

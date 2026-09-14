@@ -20,6 +20,7 @@ import { matchPiModel } from "./pi.js";
 import { createPiCompletion } from "./completion.js";
 import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes.js";
 import {
+  clearClassificationCache,
   loadCache,
   loadFailures,
   loadLatencies,
@@ -103,6 +104,26 @@ export function createExtension(opts: AdapterOptions = {}) {
     let lastObjective: string | undefined;
     let lastClassification: Classification | undefined;
     let classifierPromise: Promise<Classifier> | undefined;
+    let cacheWritePromise: Promise<void> = Promise.resolve();
+
+    pi.registerCommand?.("switchyard-clear-cache", {
+      description: "Clear cached Switchyard task classifications",
+      handler: async (_args, ctx) => {
+        try {
+          // Let an in-flight cache write finish before deleting the file, or it
+          // could recreate the cache immediately after this command returns.
+          await cacheWritePromise.catch(() => undefined);
+          await clearClassificationCache(opts.cacheFile);
+          classifierPromise = undefined;
+          lastObjective = undefined;
+          lastClassification = undefined;
+          ctx.ui?.notify?.("Switchyard classification cache cleared.", "info");
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          ctx.ui?.notify?.(`Could not clear Switchyard classification cache: ${message}`, "error");
+        }
+      },
+    });
 
     /**
      * The classifier escalates to a cheap model only when the deterministic
@@ -154,7 +175,10 @@ export function createExtension(opts: AdapterOptions = {}) {
               cache.get(ClassificationCache.key(task as never)),
             set: (task: { kind?: string; objective: string }, value: Classification) => {
               cache.set(ClassificationCache.key(task as never), value);
-              void saveCache(Object.fromEntries(cache), opts.cacheFile);
+              const snapshot = Object.fromEntries(cache);
+              cacheWritePromise = cacheWritePromise
+                .catch(() => undefined)
+                .then(() => saveCache(snapshot, opts.cacheFile));
             },
           };
 
@@ -215,8 +239,16 @@ export function createExtension(opts: AdapterOptions = {}) {
         classification = { ...lastClassification, source: "model" };
       } else {
         classification = await getClassifier(ctx, snapshot).then((c) => c.classify({ objective }));
-        lastObjective = objective;
-        lastClassification = classification;
+        // A provider/auth/HTTP failure degrades to the local classifier. That
+        // keeps this turn working, but it must not become a reusable session
+        // result; the persistent classifier cache already follows this rule.
+        if (!classification.degraded) {
+          lastObjective = objective;
+          lastClassification = classification;
+        } else {
+          lastObjective = undefined;
+          lastClassification = undefined;
+        }
       }
       const outcomes = await readOutcomes(opts.outcomeFile);
       const signals: Record<string, RoutingSignal> = {

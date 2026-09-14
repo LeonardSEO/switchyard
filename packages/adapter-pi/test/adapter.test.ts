@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { rmSync } from "node:fs";
+import { existsSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapacityState, ModelCapabilities } from "@vepando/switchyard-core";
@@ -40,6 +40,10 @@ const sol = model("codex-sol", "codex-subscription", "subscription", 0, 0.774, 0
 
 function fakePi(models: PiModelLike[]) {
   const handlers: Record<string, (event: unknown, ctx: PiContextLike) => unknown> = {};
+  const commands: Record<
+    string,
+    { description?: string; handler(args: string, ctx: PiContextLike): Promise<void> }
+  > = {};
   const calls: { model?: string; level?: string; notify?: string } = {};
   const ctx: PiContextLike = {
     modelRegistry: { getAvailable: () => models },
@@ -56,8 +60,11 @@ function fakePi(models: PiModelLike[]) {
     setThinkingLevel: (level: string) => {
       calls.level = level;
     },
+    registerCommand: (name, command) => {
+      commands[name] = command;
+    },
   };
-  return { pi, ctx, handlers, calls };
+  return { pi, ctx, handlers, commands, calls };
 }
 
 const snapshotOf = (
@@ -200,6 +207,19 @@ describe("pi adapter", () => {
     })(pi);
     await handlers.before_agent_start!({ prompt: "rename a variable" }, ctx);
     expect(calls.model).toBeUndefined();
+  });
+
+  it("registers a command that clears the classification cache", async () => {
+    const cacheFile = tempFile();
+    writeFileSync(cacheFile, JSON.stringify({ cached: true }), "utf8");
+    const { pi, ctx, commands, calls } = fakePi(available);
+    createExtension({ cacheFile, quiet: true })(pi);
+
+    expect(commands["switchyard-clear-cache"]?.description).toContain("classifications");
+    await commands["switchyard-clear-cache"]!.handler("", ctx);
+
+    expect(existsSync(cacheFile)).toBe(false);
+    expect(calls.notify).toBe("Switchyard classification cache cleared.");
   });
 
   it("records the outcome and learns from it", async () => {
@@ -486,5 +506,44 @@ describe("task similarity", () => {
       globalThis.fetch = originalFetch;
     }
     expect(calls).toBe(1);
+  });
+
+  it("classifies the same task again after the cache-clear command", async () => {
+    const { ctx } = fakeCtxWithAuth({ apiKey: "k", baseUrl: "https://example.test/v1" });
+    ctx.modelRegistry.getAvailable = () => [{ id: "cheap/classifier", provider: "openrouter" }];
+    const { pi, handlers, commands } = fakePi([]);
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = (async () => {
+      calls += 1;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: '{"kind":"code-change","complexity":"advanced"}' } }],
+        }),
+      } as unknown as Response;
+    }) as typeof fetch;
+    try {
+      createExtension({
+        loadSnapshot: async () =>
+          snapshotOf([
+            classifierModel("cheap/classifier", 0.01, 0.55),
+            classifierModel("frontier/large", 3, 0.8, "large"),
+          ]),
+        outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
+        quiet: true,
+      })(pi);
+      const event = { prompt: "Add OpenTelemetry tracing across the HTTP and worker layers" };
+      await handlers.before_agent_start!(event, ctx);
+      await commands["switchyard-clear-cache"]!.handler("", ctx);
+      await handlers.before_agent_start!(event, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    expect(calls).toBe(2);
   });
 });

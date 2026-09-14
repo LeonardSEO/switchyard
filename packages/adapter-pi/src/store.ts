@@ -71,6 +71,12 @@ export async function saveCache(
   await writeJson(path, Object.fromEntries(entries));
 }
 
+/** Remove saved task classifications so matching tasks are classified again. */
+export async function clearClassificationCache(path = paths().cache): Promise<void> {
+  const { rm } = await import("node:fs/promises");
+  await rm(path, { force: true });
+}
+
 /**
  * Latency per classifier model, as an exponential moving average. Selection
  * uses it so the router stops choosing a model that is cheap but slow.

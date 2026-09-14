@@ -29,6 +29,10 @@ pi install npm:@vepando/switchyard
 
 That is enough. The npm keyword `pi-package` makes the package eligible for the Pi package gallery as its index refreshes.
 
+Run `/switchyard-clear-cache` in Pi whenever you want to remove saved task
+classifications. The next matching task will be classified again; model choices
+are never stored in this cache.
+
 ### OpenCode
 
 ```bash
