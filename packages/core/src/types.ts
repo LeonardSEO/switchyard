@@ -21,7 +21,13 @@ export type TaskKind =
  * next to a distributed rewrite. The rung sets what a task demands, and demand
  * is what a model has to clear.
  */
-export type Complexity = "trivial" | "simple" | "moderate" | "complex" | "frontier";
+export type Complexity =
+  | "trivial"
+  | "simple"
+  | "moderate"
+  | "advanced"
+  | "complex"
+  | "frontier";
 export type Risk = "low" | "medium" | "high";
 
 /** "unknown" is explicit: metadata that does not declare a tier must not be

@@ -98,7 +98,15 @@ export function route(
     DEFAULT_FAILURE_COST_BY_RISK.low;
   const priced: TaskSpec = { ...task, failureCostUsd: failureCost };
 
-  const { survivors, pruned } = filterCandidates(priced, kind, complexity, models, opts);
+  let { survivors, pruned } = filterCandidates(priced, kind, complexity, models, opts);
+  // A reserve is a preference, not a wall: if nothing else can do the task,
+  // spend the reserve rather than fail closed.
+  if (survivors.length === 0 && pruned.some((p) => p.reason.startsWith("quota reserve"))) {
+    ({ survivors, pruned } = filterCandidates(priced, kind, complexity, models, {
+      ...opts,
+      minQuotaFraction: 0,
+    }));
+  }
 
   const ranked: RankedCandidate[] = survivors
     .map((m) => {
@@ -196,7 +204,8 @@ export function route(
 // expected costs are nearly identical and any preference would decide
 // everything: there, being frugal with quota is the whole point. On complex and
 // frontier work the subscription is the right call while it lasts.
-const earnedCapacityIsWorthSpending = complexity === "complex" || complexity === "frontier";
+const earnedCapacityIsWorthSpending =
+  complexity === "advanced" || complexity === "complex" || complexity === "frontier";
 const topBeforePreference = ranked[0]?.model ?? null;
 if (
   earnedCapacityIsWorthSpending &&

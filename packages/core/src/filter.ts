@@ -10,6 +10,9 @@ import { tierMeetsComplexity } from "./complexity";
 import { capacityBlocked, defaultQuotaConfig, effectiveInputPer1M, type QuotaConfig } from "./quota";
 import { estimateCostUsd, MIN_CAPABILITY_BY_COMPLEXITY } from "./scorer";
 
+/** Default reserve: keep the last 10% of a quota window. */
+export const DEFAULT_MIN_QUOTA_FRACTION = 0.1;
+
 export interface PrunedCandidate {
   model: ModelCapabilities;
   reason: string;
@@ -20,6 +23,12 @@ export interface FilterContext {
   signals?: Record<string, RoutingSignal>;
   quota?: QuotaConfig;
   nowMs?: number;
+  /**
+   * Reserve: below this fraction of remaining quota, subscription capacity is
+   * held back. It cannot be refilled within the window, so running it to zero
+   * on a routine task costs you the option of using it when it matters.
+   */
+  minQuotaFraction?: number;
 }
 
 /**
@@ -62,6 +71,15 @@ function rejectionReason(
   }
   // Batch endpoints answer hours later, not in the middle of a coding session.
   if (m.batchOnly && !task.allowBatch) return "async batch endpoint";
+
+  const usage = ctx.capacity?.[m.id];
+  if (
+    usage?.available === true &&
+    usage.usage &&
+    usage.usage.remainingFraction < (ctx.minQuotaFraction ?? DEFAULT_MIN_QUOTA_FRACTION)
+  ) {
+    return `quota reserve (${Math.round(usage.usage.remainingFraction * 100)}% left)`;
+  }
   if (m.weaknesses?.includes(kind)) return `weakness: ${kind}`;
 
   const needed = task.contextTokens ?? 0;

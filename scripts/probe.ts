@@ -14,6 +14,8 @@ import {
   keywordClassification,
   route,
   effectiveInputPer1M,
+  type CapacityState,
+  type Complexity,
   type ModelCapabilities,
   type TaskSpec,
 } from "@switchyard/core";
@@ -26,8 +28,11 @@ const models = snapshot.models;
 const signals = signalsFromCatalog(models);
 console.log(`codex quota: ${snapshot.usage.note}  [${snapshot.usage.source}]`);
 
-const price = (m: ModelCapabilities): number | undefined => {
-  const p = effectiveInputPer1M(m, snapshot.capacity[m.id]);
+const price = (
+  m: ModelCapabilities,
+  capacity: Record<string, CapacityState> = snapshot.capacity,
+): number | undefined => {
+  const p = effectiveInputPer1M(m, capacity[m.id]);
   return p.known ? p.value : undefined;
 };
 const kind = (m: ModelCapabilities): string =>
@@ -128,6 +133,44 @@ for (const c of ["simple", "moderate", "complex"] as const) {
       (bestUnmeasured ? ` score=${bestUnmeasured.score.toFixed(3)} vs winner ${d.ranked[0].score.toFixed(3)} (${d.ranked[0].model.id})` : ""),
   );
 }
+
+// ---------------------------------------------------------------- 0
+console.log("\n=== 0. the ladder (one representative task per rung) ===");
+const rungs: Array<[Complexity, string]> = [
+  ["trivial", "Rename the variable total to orderTotal in the checkout module."],
+  ["simple", "Add input validation to the HTTP client."],
+  ["moderate", "Refactor the duplicated authentication service into one helper."],
+  ["advanced", "Implement pagination, filtering and sorting for the orders API."],
+  ["complex", "Debug the intermittent deadlock in the distributed event pipeline."],
+  ["frontier", "Rewrite the billing service from scratch as a scalable event-driven system."],
+];
+const showLadder = (label: string, capacity: Record<string, import("@switchyard/core").CapacityState>) => {
+  console.log(`\n${label}`);
+  console.log(["rung", "chosen", "$/M", "cap", "effort", "adm", "cands"].join("\t"));
+  for (const [rung, objective] of rungs) {
+    const t: TaskSpec = { objective, complexity: rung, risk: rung === "trivial" || rung === "simple" ? "low" : rung === "frontier" || rung === "complex" ? "high" : "medium" };
+    const cls = keywordClassification(t);
+    const d = route(t, models, cls, { capacity, signals });
+    const p = d.model ? price(d.model, capacity) : undefined;
+    console.log(
+      [
+        rung,
+        d.model?.id ?? "none",
+        p === undefined ? "?" : p.toFixed(3),
+        d.model?.capabilityScore?.toFixed(2) ?? "?",
+        d.effort,
+        d.admissionRequired ? "y" : "n",
+        String(d.ranked.length),
+      ].join("\t"),
+    );
+  }
+};
+showLadder("with real codex quota (as measured):", snapshot.capacity);
+const drained: Record<string, import("@switchyard/core").CapacityState> = { ...snapshot.capacity };
+for (const id of ["codex-luna", "codex-terra", "codex-sol", "codex-astra"]) {
+  drained[id] = { available: true, usage: { remainingFraction: 0.04, windowElapsedFraction: 0.85, source: "probe" } };
+}
+showLadder("with codex quota nearly drained:", drained);
 
 // ---------------------------------------------------------------- 6
 console.log("\n=== 6. cost of failure (30k context, realistic agent session) ===");

@@ -85,15 +85,17 @@ export function inferComplexity(
   }
 
   const complexity: Complexity =
-    score >= 7
+    score >= 8
       ? "frontier"
-      : score >= 4
+      : score >= 6
         ? "complex"
-        : score >= 1
-          ? "moderate"
-          : score <= -3
-            ? "trivial"
-            : "simple";
+        : score >= 3
+          ? "advanced"
+          : score >= 1
+            ? "moderate"
+            : score <= -3
+              ? "trivial"
+              : "simple";
   return { complexity, score, matched, source: "inferred" };
 }
 
@@ -108,8 +110,10 @@ export function estimateComplexity(task: TaskSpec, kind: TaskKind): ComplexityEs
 export function tierMeetsComplexity(tier: string, complexity: Complexity): boolean {
   switch (complexity) {
     case "complex":
+    case "frontier":
       return tier === "large";
     case "moderate":
+    case "advanced":
       return tier === "mid" || tier === "large";
     default:
       return true;

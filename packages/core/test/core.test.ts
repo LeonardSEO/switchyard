@@ -67,6 +67,7 @@ describe("complexity", () => {
 
   it("matches veto's thresholds and extends them with two rungs", () => {
     expect(keywordClassification({ objective: "build e2e CQRS infrastructure with event sourcing" }).complexity).toBe("frontier");
+    expect(keywordClassification({ objective: "design the service architecture" }).complexity).toBe("advanced");
     expect(keywordClassification({ objective: "implement authentication service" }).complexity).toBe("moderate");
     expect(keywordClassification({ objective: "create simple html page" }).complexity).toBe("simple");
     expect(keywordClassification({ objective: "create a simple hello world page" }).complexity).toBe("trivial");
@@ -159,11 +160,12 @@ describe("scoring", () => {
   it("routes away from a model with exhausted capacity", () => {
     const task = { objective: "refactor the duplicated authentication service", kind: "refactor" as const };
     const cls = keywordClassification(task);
-    const withCapacity = route(task, [cheap, mid, luna], cls, {
+    const small = { ...cheap, capabilityScore: 0.2 };
+    const withCapacity = route(task, [small, mid, luna], cls, {
       capacity: { "codex-luna": { available: false, reason: "rate limited" } },
     });
     expect(withCapacity.model?.id).toBe("balanced-mid");
-    const plenty = route(task, [cheap, mid, luna], cls, {
+    const plenty = route(task, [small, mid, luna], cls, {
       capacity: {
         "codex-luna": { available: true, usage: { remainingFraction: 0.95, windowElapsedFraction: 0.05, source: "t" } },
       },

@@ -14,10 +14,11 @@ export const CHEAP_FLOOR_PER_1M = 0.01;
  */
 export const DEMAND_BY_COMPLEXITY: Record<string, number> = {
   trivial: 0.15,
-  simple: 0.25,
-  moderate: 0.45,
-  complex: 0.65,
-  frontier: 0.8,
+  simple: 0.3,
+  moderate: 0.5,
+  advanced: 0.58,
+  complex: 0.68,
+  frontier: 0.85,
 };
 
 /**
@@ -27,9 +28,10 @@ export const DEMAND_BY_COMPLEXITY: Record<string, number> = {
  */
 export const MIN_CAPABILITY_BY_COMPLEXITY: Record<string, number> = {
   trivial: 0,
-  simple: 0,
-  moderate: 0.3,
-  complex: 0.5,
+  simple: 0.15,
+  moderate: 0.35,
+  advanced: 0.5,
+  complex: 0.6,
   frontier: 0.7,
 };
 
@@ -51,7 +53,7 @@ export const UNMEASURED_CAPABILITY = 0.4;
  * microdollars on a real task — decides between a measured model and one nobody
  * has scored.
  */
-export const UNMEASURED_RISK_PREMIUM = 1.25;
+export const UNMEASURED_RISK_PREMIUM = 1.5;
 
 export function effectiveCapability(capability: number, demand: number): number {
   return Math.min(capability, demand + OVERQUALIFICATION_BAND);
@@ -288,9 +290,13 @@ export function effortForComplexity(complexity: string, risk: Risk | undefined):
       ? "xhigh"
       : complexity === "complex"
         ? "high"
-        : complexity === "moderate"
-          ? "medium"
-          : "low";
+        : complexity === "advanced"
+          ? "high"
+          : complexity === "moderate"
+            ? "medium"
+            : complexity === "simple"
+              ? "low"
+              : "minimal";
   const bumped = risk === "high" ? EFFORT_LADDER[Math.min(EFFORT_LADDER.indexOf(base) + 1, EFFORT_LADDER.length - 1)] : base;
   return bumped;
 }
