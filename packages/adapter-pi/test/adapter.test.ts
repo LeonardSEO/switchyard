@@ -276,7 +276,7 @@ describe("classifier escalation", () => {
     expect(captured.body).toContain("cheap/classifier");
   });
 
-  it("does not call a model when the deterministic answer is confident", async () => {
+  it("does not call a model when escalation is 'uncertain' and the keyword answer is confident", async () => {
     let called = false;
     const originalFetch = globalThis.fetch;
     globalThis.fetch = (async () => {
@@ -289,6 +289,7 @@ describe("classifier escalation", () => {
         loadSnapshot: async () => snapshotOf([classifierModel("cheap/classifier", 0.01, 0.55)]),
         outcomeFile: tempFile(),
         quiet: true,
+        escalation: "uncertain",
       })(pi);
       await handlers.before_agent_start!({ prompt: certain }, ctx);
     } finally {
@@ -361,5 +362,45 @@ describe("classifier call shape", () => {
     expect(captured.body).toContain('"reasoning"');
     expect(captured.body).toContain('"minimal"');
     expect(captured.body).toContain("thinking/cheap");
+  });
+});
+
+describe("escalation policy", () => {
+  it("asks the model even when the keyword answer looks confident", async () => {
+    const { ctx, captured } = fakeCtxWithAuth({ apiKey: "k", baseUrl: "https://example.test/v1" });
+    ctx.modelRegistry.getAvailable = () => [{ id: "cheap/classifier", provider: "openrouter" }];
+    const { pi, handlers } = fakePi([]);
+    const originalFetch = globalThis.fetch;
+    let called = 0;
+    globalThis.fetch = (async (_url: unknown, init: unknown) => {
+      called += 1;
+      captured.body = (init as { body: string }).body;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            { message: { content: '{"kind":"code-change","complexity":"complex","confidence":0.9}' } },
+          ],
+        }),
+      } as unknown as Response;
+    }) as typeof fetch;
+    try {
+      createExtension({
+        loadSnapshot: async () =>
+          snapshotOf([
+            classifierModel("cheap/classifier", 0.01, 0.55),
+            classifierModel("frontier/large", 3, 0.8, "large"),
+          ]),
+        outcomeFile: tempFile(),
+        quiet: true,
+      })(pi);
+      // Confident keyword answer (trivial), yet escalation is on by default.
+      await handlers.before_agent_start!({ prompt: "create a simple hello world page" }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    expect(called).toBe(1);
+    expect(captured.body).toContain("cheap/classifier");
   });
 });

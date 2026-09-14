@@ -26,6 +26,12 @@ export interface AdapterOptions {
   outcomeFile?: string;
   /** Tell the user what was chosen. Off in tests. */
   quiet?: boolean;
+  /**
+   * When to spend a classification call. Default "always" (measured 8/10 vs
+   * 5/10 for keywords). Use "uncertain" to save the round trip, or "never" for
+   * offline or private use where no objective should leave the machine.
+   */
+  escalation?: "always" | "uncertain" | "never";
 }
 
 interface PendingRun {
@@ -74,6 +80,12 @@ export function createExtension(opts: AdapterOptions = {}) {
             models: apiModels,
             complete: createPiCompletion(ctx),
             modelId: picked.id,
+            // Measured: keyword 5/10 vs model 8/10 on the corpus, at $0.00014
+            // for nine calls. The rung decides every other decision, so it is
+            // worth one cheap round trip. Cached, budgeted, and it degrades to
+            // the keyword answer if the call fails.
+            escalation: opts.escalation ?? "always",
+            minSavingsFactor: 0,
           });
         })();
       }

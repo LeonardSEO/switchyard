@@ -140,6 +140,25 @@ intersected with `ctx.modelRegistry.getAvailable()`, so a model pi has no
 credentials for is never selected. Codex subscription models are matched by name
 against pi's Codex provider, and are skipped when that login is absent.
 
+## Does the AI classifier earn its round trip?
+
+Measured on the corpus (`npm run eval:classifier -- --live --always`), ten tasks
+with known complexity, using `ling-3.0-flash` as classifier:
+
+| | accuracy | calls | spend |
+|---|---|---|---|
+| keyword | 5/10 | 0 | $0 |
+| model, always | **8/10** | 9 | **$0.00014** |
+
+Fourteen thousandths of a cent for three extra correct rungs, and the two
+remaining misses are upwards ("add a retry" classified moderate instead of
+simple) — the safe direction, and arguably correct: the corpus records cheap
+models failing on exactly those tasks.
+
+So the adapter classifies with a model by default (`escalation: "always"`),
+cached and budgeted at $0.001 per call, with the keyword answer as the offline
+and failure fallback. `escalation: "never"` keeps every objective local.
+
 ## Next
 
 

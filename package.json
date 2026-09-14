@@ -13,7 +13,8 @@
     "bench": "tsx eval/benchmark.ts",
     "bench:live": "tsx scripts/bench-live.ts",
     "catalog": "tsx scripts/catalog.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eval:classifier": "tsx scripts/classifier-eval.ts"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",

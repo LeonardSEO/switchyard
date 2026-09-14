@@ -1,0 +1,11 @@
+{
+  "inclusionai/ling-3.0-flash|Find the cause of the timeout in the worker service.": "{\"kind\":\"debug\",\"complexity\":\"moderate\",\"confidence\":0.6}",
+  "inclusionai/ling-3.0-flash|Design a migration plan for the distributed event pipeline.": "{\"kind\":\"plan\",\"complexity\":\"complex\",\"confidence\":0.95}",
+  "inclusionai/ling-3.0-flash|Debug the intermittent deadlock in the distributed event pipeline.": "{\"kind\":\"debug\",\"complexity\":\"complex\",\"confidence\":0.95}",
+  "inclusionai/ling-3.0-flash|Summarize the release notes in five bullets.": "I don't see any release notes attached or included in your message. Could you please provide the release notes you'd like me to summarize into five bullets?",
+  "inclusionai/ling-3.0-flash|Add a retry to the HTTP client.": "{\"kind\": \"code-change\", \"complexity\": \"moderate\", \"confidence\": 0.85}",
+  "inclusionai/ling-3.0-flash|Refactor the duplicated authentication handlers.": "{\"kind\":\"refactor\",\"complexity\":\"moderate\",\"confidence\":0.85}",
+  "inclusionai/ling-3.0-flash|Add input validation to the HTTP client.": "{\"kind\":\"code-change\",\"complexity\":\"moderate\",\"confidence\":0.85}",
+  "inclusionai/ling-3.0-flash|Rename the variable total to orderTotal in the checkout module.": "{\"kind\":\"refactor\",\"complexity\":\"simple\",\"confidence\":0.95}",
+  "inclusionai/ling-3.0-flash|Implement pagination for the orders API endpoint.": "{\"kind\": \"code-change\", \"complexity\": \"moderate\", \"confidence\": 0.85}"
+}

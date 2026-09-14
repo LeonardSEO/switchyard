@@ -179,6 +179,12 @@ export interface ModelClassifierOptions {
   cache?: ClassificationCache;
   /** Overrides automatic cheapest-model selection. */
   modelId?: string;
+  /**
+   * When to spend a call. "uncertain" (default) only asks when the keyword
+   * score sits near a threshold; "always" asks for every task, which is right
+   * when the rung is worth more than the latency; "never" is offline mode.
+   */
+  escalation?: "uncertain" | "always" | "never";
 }
 
 const CLASSIFIER_SYSTEM = `You classify a coding task for a model router.
@@ -226,7 +232,8 @@ export class ModelClassifier implements Classifier {
     const cached = this.cache.get(task);
     if (cached) return cached;
 
-    if (!isUncertain(base)) return base;
+    if (this.opts.escalation === "never") return base;
+    if (this.opts.escalation !== "always" && !isUncertain(base)) return base;
 
     const model =
       this.opts.models.find((m) => m.id === this.opts.modelId) ??
@@ -240,8 +247,13 @@ export class ModelClassifier implements Classifier {
     const approxCost = classificationCost(model, task);
     if (approxCost > this.maxCostUsd) return base;
 
-    const saving = expectedTierSaving(task, base.complexity, this.opts.models);
-    if (saving <= approxCost * this.minSavingsFactor) return base;
+    // 0 disables the gate entirely. It exists to skip classification when the
+    // rung cannot change anything, but a non-zero saving is not measurable from
+    // tier price deltas alone: cheap models qualify for every rung.
+    if (this.minSavingsFactor > 0) {
+      const saving = expectedTierSaving(task, base.complexity, this.opts.models);
+      if (saving <= approxCost * this.minSavingsFactor) return base;
+    }
 
     try {
       const res = await this.opts.complete({
