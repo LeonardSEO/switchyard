@@ -6,9 +6,9 @@ import type {
   RoutingSignal,
   TaskKind,
   TaskSpec,
-} from "./types";
-import type { Classification } from "./classifier";
-import { filterCandidates, type FilterContext, type PrunedCandidate } from "./filter";
+} from "./types.js";
+import type { Classification } from "./classifier.js";
+import { filterCandidates, type FilterContext, type PrunedCandidate } from "./filter.js";
 import {
   defaultWeights,
   DEMAND_BY_COMPLEXITY,
@@ -16,8 +16,8 @@ import {
   effortForComplexity,
   scoreCandidate,
   type Weights,
-} from "./scorer";
-import { defaultQuotaConfig, type QuotaConfig } from "./quota";
+} from "./scorer.js";
+import { defaultQuotaConfig, type QuotaConfig } from "./quota.js";
 
 /**
  * Deterministic ordering. Two candidates can be genuinely indistinguishable —

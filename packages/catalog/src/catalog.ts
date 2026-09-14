@@ -5,7 +5,7 @@ import type {
   TaskKind,
 } from "@switchyard/core";
 import type { ModelSource, SourceResult } from "@switchyard/provider-openrouter";
-import { CodexSubscriptionSource } from "./codex-subscription";
+import { CodexSubscriptionSource } from "./codex-subscription.js";
 
 export interface SourceStatus {
   source: string;

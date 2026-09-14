@@ -1,4 +1,4 @@
-import type { Complexity, TaskKind, TaskSpec } from "./types";
+import type { Complexity, TaskKind, TaskSpec } from "./types.js";
 
 /**
  * Complexity inference, ported from veto's pkg/router (keyword scoring) with

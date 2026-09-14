@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import type { ModelCapabilities } from "@switchyard/core";
-import { defaultCodexModels, type CodexModelSpec } from "./codex-subscription";
+import { defaultCodexModels, type CodexModelSpec } from "./codex-subscription.js";
 
 /**
  * The Codex roster is the one list we cannot fetch — OpenAI publishes no catalog

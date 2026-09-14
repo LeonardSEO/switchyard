@@ -1,6 +1,6 @@
-import type { CapacityState, Known, ModelCapabilities, ReasoningEffort, Risk, RoutingSignal, TaskKind, TaskSpec } from "./types";
-import { known } from "./types";
-import { effectiveInputPer1M, effectiveOutputPer1M, type QuotaConfig } from "./quota";
+import type { CapacityState, Known, ModelCapabilities, ReasoningEffort, Risk, RoutingSignal, TaskKind, TaskSpec } from "./types.js";
+import { known } from "./types.js";
+import { effectiveInputPer1M, effectiveOutputPer1M, type QuotaConfig } from "./quota.js";
 
 /** Opus-class input cost, used as the "expensive" reference point (veto's ref). */
 export const REFERENCE_INPUT_PER_1M = 15;

@@ -1,11 +1,11 @@
 import type { CapacityState, ModelCapabilities } from "@switchyard/core";
 import { OpenRouterSource } from "@switchyard/provider-openrouter";
-import { CodexSubscriptionSource, type CodexSourceOptions } from "./codex-subscription";
-import { detectCodexEnvironment } from "./codex-subscription";
-import { loadCodexModels, resolveRoster, type CapabilityMatch } from "./codex-models";
-import { readCodexUsage, type UsageReading } from "./codex-usage";
-import { OpenAICompatibleSource } from "./local";
-import { Catalog, type SourceStatus } from "./catalog";
+import { CodexSubscriptionSource, type CodexSourceOptions } from "./codex-subscription.js";
+import { detectCodexEnvironment } from "./codex-subscription.js";
+import { loadCodexModels, resolveRoster, type CapabilityMatch } from "./codex-models.js";
+import { readCodexUsage, type UsageReading } from "./codex-usage.js";
+import { OpenAICompatibleSource } from "./local.js";
+import { Catalog, type SourceStatus } from "./catalog.js";
 
 export interface Snapshot {
   models: ModelCapabilities[];

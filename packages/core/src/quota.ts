@@ -1,5 +1,5 @@
-import type { CapacityState, Known, ModelCapabilities, Usage } from "./types";
-import { known, unknown } from "./types";
+import type { CapacityState, Known, ModelCapabilities, Usage } from "./types.js";
+import { known, unknown } from "./types.js";
 
 /**
  * Quota intelligence: the piece veto does not have.

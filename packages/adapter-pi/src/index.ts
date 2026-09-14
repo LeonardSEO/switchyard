@@ -15,10 +15,10 @@ import {
 } from "@switchyard/core";
 import type { Snapshot } from "@switchyard/catalog";
 import { signalsFromCatalog } from "@switchyard/catalog";
-import type { PiApiLike, PiContextLike, PiModelLike } from "./pi";
-import { matchPiModel } from "./pi";
-import { createPiCompletion } from "./completion";
-import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes";
+import type { PiApiLike, PiContextLike, PiModelLike } from "./pi.js";
+import { matchPiModel } from "./pi.js";
+import { createPiCompletion } from "./completion.js";
+import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes.js";
 import {
   loadCache,
   loadFailures,
@@ -26,12 +26,12 @@ import {
   recordFailure,
   recordLatency,
   saveCache,
-} from "./store";
+} from "./store.js";
 
-export * from "./pi";
-export * from "./outcomes";
-export * from "./store";
-export * from "./completion";
+export * from "./pi.js";
+export * from "./outcomes.js";
+export * from "./store.js";
+export * from "./completion.js";
 
 export interface AdapterOptions {
   /** Injectable for tests; defaults to the live snapshot builder. */

@@ -1,11 +1,11 @@
-import type { Complexity, ModelCapabilities, TaskKind, TaskSpec } from "./types";
-import { estimateTokens } from "./scorer";
+import type { Complexity, ModelCapabilities, TaskKind, TaskSpec } from "./types.js";
+import { estimateTokens } from "./scorer.js";
 import {
   estimateComplexity,
   inferComplexity,
   inferKind,
   tierMeetsComplexity,
-} from "./complexity";
+} from "./complexity.js";
 
 /**
  * Task classification.

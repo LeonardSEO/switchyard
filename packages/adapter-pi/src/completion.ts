@@ -1,5 +1,5 @@
 import type { CompletionFn, CompletionRequest, CompletionResult } from "@switchyard/core";
-import type { PiContextLike } from "./pi";
+import type { PiContextLike } from "./pi.js";
 
 /**
  * A completion call that borrows Pi's existing credentials.

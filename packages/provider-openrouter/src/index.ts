@@ -1,2 +1,2 @@
-export * from "./openrouter";
-export * from "./completion";
+export * from "./openrouter.js";
+export * from "./completion.js";

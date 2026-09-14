@@ -5,10 +5,10 @@ import type {
   RoutingSignal,
   TaskKind,
   TaskSpec,
-} from "./types";
-import { tierMeetsComplexity } from "./complexity";
-import { capacityBlocked, defaultQuotaConfig, effectiveInputPer1M, type QuotaConfig } from "./quota";
-import { estimateCostUsd, MIN_CAPABILITY_BY_COMPLEXITY } from "./scorer";
+} from "./types.js";
+import { tierMeetsComplexity } from "./complexity.js";
+import { capacityBlocked, defaultQuotaConfig, effectiveInputPer1M, type QuotaConfig } from "./quota.js";
+import { estimateCostUsd, MIN_CAPABILITY_BY_COMPLEXITY } from "./scorer.js";
 
 /** Default reserve: keep the last 10% of a quota window. */
 export const DEFAULT_MIN_QUOTA_FRACTION = 0.1;
