@@ -4,10 +4,9 @@ import { createGateway, type Gateway } from "@vepando/switchyard-gateway";
  * OpenCode plugin.
  *
  * OpenCode has no hook rich enough to pick a model per request, but it does
- * support custom OpenAI-compatible providers. So the plugin does the boring,
- * necessary thing: make sure a Switchyard gateway is reachable, and tell the user
- * the one snippet to add to opencode.json. Routing then happens in the gateway,
- * per request, with the same logic the Pi adapter uses.
+ * support custom OpenAI-compatible providers. The plugin starts a local
+ * Switchyard gateway and registers that provider automatically. Routing then
+ * happens in the gateway, per request, with the same logic the Pi adapter uses.
  */
 
 export interface OpenCodePluginInput {
@@ -25,6 +24,10 @@ export interface GatewayHandle {
   baseUrl: string;
   started: boolean;
   close?: () => Promise<void>;
+}
+
+export interface OpenCodeConfig {
+  provider?: Record<string, unknown>;
 }
 
 export async function ensureGateway(
@@ -61,7 +64,6 @@ function isAddressInUse(err: unknown): boolean {
   return code === "EADDRINUSE" || code === "EADDRNOTAVAIL";
 }
 
-/** The config the user needs once. */
 export function providerConfig(baseUrl: string, port: number) {
   return {
     provider: {
@@ -77,22 +79,44 @@ export function providerConfig(baseUrl: string, port: number) {
   };
 }
 
-export const SwitchyardPlugin = async (_input: OpenCodePluginInput = {}) => {
-  const handle = await ensureGateway();
-  const config = providerConfig(handle.baseUrl, handle.port);
+function record(value: unknown): Record<string, unknown> {
+  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
 
-  console.log(`[switchyard] gateway ${handle.baseUrl} (${handle.started ? "started" : "already running"})`);
-  console.log("[switchyard] add this to opencode.json, then pick model `switchyard/auto`:");
-  console.log(JSON.stringify(config, null, 2));
+/** Add Switchyard without overwriting user-supplied provider options or models. */
+export function configureOpenCode(config: OpenCodeConfig, baseUrl: string, port: number): void {
+  const defaults = providerConfig(baseUrl, port).provider.switchyard;
+  const providers = record(config.provider);
+  const existing = record(providers.switchyard);
+  const existingOptions = record(existing.options);
+  const existingModels = record(existing.models);
 
-  return {
-    event: async ({ event }: { event: { type?: string } }) => {
-      // Nothing to do per event yet: routing happens in the gateway.
-      if (event?.type === "session.error") {
-        console.warn("[switchyard] session error; is the gateway still up?");
-      }
+  config.provider = {
+    ...providers,
+    switchyard: {
+      ...defaults,
+      ...existing,
+      options: { ...defaults.options, ...existingOptions },
+      models: { ...defaults.models, ...existingModels },
     },
   };
-};
+}
+
+export function createOpenCodePlugin(startGateway: typeof ensureGateway = ensureGateway) {
+  return async (_input: OpenCodePluginInput = {}) => {
+    const handle = await startGateway();
+
+    return {
+      config: async (config: OpenCodeConfig) => {
+        configureOpenCode(config, handle.baseUrl, handle.port);
+      },
+      dispose: async () => {
+        if (handle.started) await handle.close?.();
+      },
+    };
+  };
+}
+
+export const SwitchyardPlugin = createOpenCodePlugin();
 
 export default SwitchyardPlugin;

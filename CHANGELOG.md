@@ -2,7 +2,18 @@
 
 Notable changes to Switchyard are documented here.
 
-## 0.3.0 - unreleased
+## 0.3.1 - unreleased
+
+### Fixed
+
+- Register the OpenCode provider automatically when the plugin loads.
+- Close a plugin-owned local gateway when OpenCode disposes the plugin.
+
+### Changed
+
+- Install the OpenCode integration with one `opencode plugin @vepando/switchyard` command; manual provider configuration is no longer required.
+
+## 0.3.0 - 2026-09-14
 
 ### Added
 

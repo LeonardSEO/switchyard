@@ -1,0 +1,40 @@
+{
+  "name": "@vepando/switchyard-opencode",
+  "version": "0.1.4",
+  "description": "Compatibility package for the unified @vepando/switchyard OpenCode plugin",
+  "type": "module",
+  "license": "Apache-2.0",
+  "author": "LeonardSEO",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/LeonardSEO/switchyard.git"
+  },
+  "homepage": "https://github.com/LeonardSEO/switchyard#readme",
+  "bugs": {
+    "url": "https://github.com/LeonardSEO/switchyard/issues"
+  },
+  "main": "./index.js",
+  "exports": {
+    ".": "./index.js"
+  },
+  "files": [
+    "index.js",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "model-router",
+    "llm-router",
+    "coding-agent"
+  ],
+  "dependencies": {
+    "@vepando/switchyard": "^0.3.1"
+  }
+}

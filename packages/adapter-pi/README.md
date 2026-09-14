@@ -19,24 +19,18 @@ pi install npm:@vepando/switchyard
 ### OpenCode
 
 ```bash
-npm install @vepando/switchyard
+opencode plugin @vepando/switchyard
 ```
+
+Restart OpenCode and choose `switchyard/auto`. Switchyard starts its local gateway and registers the provider automatically.
+
+Manual project configuration only needs the plugin entry:
 
 ```json
 {
-  "plugin": ["@vepando/switchyard"],
-  "provider": {
-    "switchyard": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Switchyard",
-      "options": { "baseURL": "http://127.0.0.1:8787/v1" },
-      "models": { "auto": { "name": "Switchyard Auto" } }
-    }
-  }
+  "plugin": ["@vepando/switchyard"]
 }
 ```
-
-Choose `switchyard/auto` after restarting OpenCode.
 
 ### Other OpenAI-compatible clients
 

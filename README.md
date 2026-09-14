@@ -32,26 +32,18 @@ That is enough. The npm keyword `pi-package` makes the package eligible for the 
 ### OpenCode
 
 ```bash
-npm install @vepando/switchyard
+opencode plugin @vepando/switchyard
 ```
 
-Add the plugin and provider to `opencode.json`:
+Restart OpenCode and choose `switchyard/auto`. The plugin starts the local gateway and registers the provider automatically.
+
+For a manual project configuration, add only the plugin:
 
 ```json
 {
-  "plugin": ["@vepando/switchyard"],
-  "provider": {
-    "switchyard": {
-      "npm": "@ai-sdk/openai-compatible",
-      "name": "Switchyard",
-      "options": { "baseURL": "http://127.0.0.1:8787/v1" },
-      "models": { "auto": { "name": "Switchyard Auto" } }
-    }
-  }
+  "plugin": ["@vepando/switchyard"]
 }
 ```
-
-Choose `switchyard/auto`. The plugin starts the local gateway when needed.
 
 ### Cursor, Cline, aider, curl, and other clients
 
