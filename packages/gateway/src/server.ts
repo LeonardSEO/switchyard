@@ -9,6 +9,8 @@ import {
   route,
   type Classification,
   type Classifier,
+  attributionHeaders,
+  type Attribution,
   type CapacityState,
   type ModelCapabilities,
 } from "@vepando/switchyard-core";
@@ -29,6 +31,8 @@ export interface GatewayOptions {
   /** Inject the model pool (tests, offline use) instead of fetching it. */
   models?: ModelCapabilities[];
   capacity?: Record<string, CapacityState>;
+  /** Override the default OpenRouter app attribution. */
+  attribution?: Attribution;
 }
 
 const DEFAULT_FRESHNESS_MS = 10 * 60 * 1000;
@@ -173,6 +177,7 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
         headers: {
           "content-type": "application/json",
           ...(opts.apiKey ? { authorization: `Bearer ${opts.apiKey}` } : {}),
+          ...attributionHeaders(opts.attribution ?? {}),
         },
         body: JSON.stringify(forwarded),
       });

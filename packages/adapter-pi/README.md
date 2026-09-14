@@ -1,42 +1,45 @@
 # @vepando/switchyard
 
-A [pi](https://pi.dev) package that routes every turn to the right model —
-including the Codex or Claude subscription you already pay for.
-
-Switchyard does not become the coding agent. Pi keeps its permissions, tools,
-MCP, sessions and authentication. The adapter answers two questions per turn:
-which model, and how hard it should think. Then it records what happened, so
-later turns route on evidence instead of on prices.
+Pi package: route every turn to the model that should take it — across OpenRouter
+(primary) and, optionally, the Codex subscription you already pay for.
 
 ```bash
 pi install npm:@vepando/switchyard
 ```
 
-## What it decides
+Pi keeps its permissions, tools, MCP, sessions and authentication. This package
+answers two questions per turn: **which model**, and **how hard it should think**
+(`minimal` → `max`). Then it records what happened, so later turns route on
+evidence instead of on prices.
 
-| rung | what it picks (API prices, your catalog will differ) |
-|---|---|
-| trivial | cheapest capable model |
-| simple | flash class |
-| moderate | large flash class |
-| advanced | pro class |
-| complex | top tier, or your subscription when it lasts |
-| frontier | frontier band, or your subscription when it lasts |
+## OpenRouter first
 
-Subscription capacity is priced, not assumed free: quota that will expire unused
-is cheap, quota that displaces other work is not, and the last 10% of a window is
-held back. Batch endpoints are excluded from interactive work.
+The catalog, prices and benchmark scores come from OpenRouter. You need an
+OpenRouter key or an OpenRouter login Pi already has.
+
+Codex support is optional: with `codex login` present, Switchyard reads your real
+quota and adds Luna/Terra/Sol/Astra as candidates. Quota is priced, not assumed
+free — nearly-drained quota is held back, with the last 10% of a window reserved.
 
 ## Configuration
 
-Everything is optional. Defaults: classify each task with a cheap model
-(measured 11/12 against 2/12 for keyword rules), cache on disk, and fall back to
-the deterministic answer if the call fails.
+Everything is optional.
 
-- `escalation: "never"` keeps every objective on the machine.
-- `classifierModel: "some/model"` pins the classifier.
+- `escalation: "never"` — no classification calls; objectives stay local.
+- `classifierModel: "<id>"` — pin the classifier.
+- `failureCostByRisk` — cost of a failed attempt, per risk level.
 
-## Requirements
+## Attribution
 
-Node 20+. A model provider Pi can already use (OpenRouter, Codex, Anthropic).
-No new credentials: the adapter borrows Pi's own.
+Every request this package makes carries OpenRouter app attribution:
+
+```http
+HTTP-Referer: https://github.com/LeonardSEO/switchyard
+X-Title: Switchyard
+```
+
+Overridable with `SWITCHYARD_APP_URL` and `SWITCHYARD_APP_TITLE`.
+
+## Docs
+
+Full documentation: https://github.com/LeonardSEO/switchyard#readme

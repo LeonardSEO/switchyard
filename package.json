@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit",
     "eval:classifier": "tsx scripts/classifier-eval.ts",
     "outcomes": "tsx scripts/outcomes.ts",
-    "build": "for p in packages/core packages/catalog packages/provider-openrouter packages/adapter-pi; do tsc -p $p/tsconfig.build.json; done"
+    "build": "for p in core catalog provider-openrouter adapter-pi gateway opencode; do tsc -p packages/$p/tsconfig.build.json || exit 1; done"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",

@@ -1,4 +1,9 @@
-import type { CompletionFn, CompletionRequest } from "@vepando/switchyard-core";
+import {
+  attributionHeaders,
+  type Attribution,
+  type CompletionFn,
+  type CompletionRequest,
+} from "@vepando/switchyard-core";
 
 /**
  * Minimal OpenRouter completion, used by the classifier and by evaluation
@@ -10,6 +15,8 @@ export interface OpenRouterCompletionOptions {
   baseUrl?: string;
   fetchFn?: typeof fetch;
   timeoutMs?: number;
+  /** Override the default OpenRouter app attribution. */
+  attribution?: Attribution;
 }
 
 export function createOpenRouterCompletion(
@@ -20,7 +27,10 @@ export function createOpenRouterCompletion(
 
   return async (req: CompletionRequest): Promise<{ text: string; costUsd?: number }> => {
     const fetchFn = opts.fetchFn ?? globalThis.fetch.bind(globalThis);
-    const headers: Record<string, string> = { "content-type": "application/json" };
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      ...attributionHeaders(opts.attribution ?? {}),
+    };
     if (opts.apiKey) headers.authorization = `Bearer ${opts.apiKey}`;
 
     const controller = new AbortController();

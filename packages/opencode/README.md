@@ -1,24 +1,17 @@
 # @vepando/switchyard-opencode
 
-OpenCode plugin that routes every prompt through Switchyard.
+OpenCode plugin that routes every prompt through Switchyard — across OpenRouter's
+catalog (primary), with Codex subscription support arriving later.
 
 ```bash
-opencode            # plugin starts the gateway on first run
+npm i @vepando/switchyard-opencode
 ```
 
-Add to `opencode.json`:
+`opencode.json` (a ready-made file is in [`examples/opencode.json`](https://github.com/LeonardSEO/switchyard/blob/main/examples/opencode.json)):
 
 ```json
 {
-  "plugin": ["@vepando/switchyard-opencode"]
-}
-```
-
-Then add the provider once (the plugin prints this on startup) and pick model
-`switchyard/auto`:
-
-```json
-{
+  "plugin": ["@vepando/switchyard-opencode"],
   "provider": {
     "switchyard": {
       "npm": "@ai-sdk/openai-compatible",
@@ -30,8 +23,12 @@ Then add the provider once (the plugin prints this on startup) and pick model
 }
 ```
 
-A ready-made config lives in `examples/opencode.json`.
+Then pick model `switchyard/auto`. The plugin starts the gateway on first run and
+prints the snippet above.
 
-Routing then happens in the gateway: rungs, Pareto band, failure cost, and
-subscription capacity when it lasts — with the chosen model on the response
-headers.
+Routing happens in the gateway: rungs, Pareto band, failure cost, with the chosen
+model on `x-switchyard-model` and `x-switchyard-complexity`.
+
+## Docs
+
+Full documentation: https://github.com/LeonardSEO/switchyard#readme

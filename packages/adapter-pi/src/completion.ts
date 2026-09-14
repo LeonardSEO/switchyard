@@ -1,4 +1,10 @@
-import type { CompletionFn, CompletionRequest, CompletionResult } from "@vepando/switchyard-core";
+import {
+  attributionHeaders,
+  type Attribution,
+  type CompletionFn,
+  type CompletionRequest,
+  type CompletionResult,
+} from "@vepando/switchyard-core";
 import type { PiContextLike } from "./pi.js";
 
 /**
@@ -21,6 +27,7 @@ export interface CompletionOptions {
   providerId?: string;
   fetchFn?: typeof fetch;
   timeoutMs?: number;
+  attribution?: Attribution;
 }
 
 export function createPiCompletion(
@@ -42,6 +49,7 @@ export function createPiCompletion(
     const headers: Record<string, string> = {
       "content-type": "application/json",
       ...(result?.auth?.headers ?? {}),
+      ...attributionHeaders(opts.attribution ?? {}),
     };
     if (apiKey) headers.authorization = `Bearer ${apiKey}`;
 

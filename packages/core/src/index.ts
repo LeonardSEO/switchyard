@@ -6,3 +6,4 @@ export * from "./filter.js";
 export * from "./classifier.js";
 export * from "./route.js";
 export * from "./pareto.js";
+export * from "./attribution.js";
