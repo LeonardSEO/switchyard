@@ -1,0 +1,189 @@
+{
+  "version": 1,
+  "attribution": "Scenarios with source=veto are ported from github.com/oleg-koval/veto (Apache-2.0) internal/eval/testdata/routing_corpus.json.",
+  "models": [
+    {
+      "id": "cheap-small",
+      "provider": "corpus",
+      "tier": "small",
+      "maxContextTokens": 200000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["extract", "summarize", "code-change"],
+      "weaknesses": ["debug", "plan", "review"],
+      "pricing": { "kind": "api", "inputPer1M": { "known": true, "value": 0.25 }, "outputPer1M": { "known": true, "value": 1.25 } }
+    },
+    {
+      "id": "balanced-mid",
+      "provider": "corpus",
+      "tier": "mid",
+      "maxContextTokens": 200000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["code-change", "debug", "review", "refactor"],
+      "weaknesses": [],
+      "pricing": { "kind": "api", "inputPer1M": { "known": true, "value": 3 }, "outputPer1M": { "known": true, "value": 15 } }
+    },
+    {
+      "id": "strong-large",
+      "provider": "corpus",
+      "tier": "large",
+      "maxContextTokens": 200000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["code-change", "debug", "plan", "review", "refactor"],
+      "weaknesses": [],
+      "pricing": { "kind": "api", "inputPer1M": { "known": true, "value": 15 }, "outputPer1M": { "known": true, "value": 75 } }
+    },
+    {
+      "id": "or-granite-micro",
+      "provider": "openrouter",
+      "tier": "small",
+      "maxContextTokens": 131072,
+      "supportsTools": ["read"],
+      "strengths": ["extract", "summarize"],
+      "weaknesses": ["plan"],
+      "pricing": { "kind": "api", "inputPer1M": { "known": true, "value": 0.017 }, "outputPer1M": { "known": true, "value": 0.112 } }
+    },
+    {
+      "id": "or-deepseek-v4-flash",
+      "provider": "openrouter",
+      "tier": "mid",
+      "maxContextTokens": 1000000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["code-change", "refactor", "summarize", "extract"],
+      "weaknesses": [],
+      "pricing": { "kind": "api", "inputPer1M": { "known": true, "value": 0.035 }, "outputPer1M": { "known": true, "value": 0.106 } }
+    },
+    {
+      "id": "codex-luna",
+      "provider": "codex-subscription",
+      "displayName": "Luna",
+      "tier": "mid",
+      "maxContextTokens": 200000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["code-change", "refactor", "summarize"],
+      "weaknesses": ["plan"],
+      "pricing": { "kind": "subscription", "inputPer1M": { "known": false }, "outputPer1M": { "known": false }, "planAmortizedPer1M": { "known": true, "value": 0.3 } }
+    },
+    {
+      "id": "codex-terra",
+      "provider": "codex-subscription",
+      "displayName": "Terra",
+      "tier": "mid",
+      "maxContextTokens": 400000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["code-change", "debug", "refactor", "review"],
+      "weaknesses": [],
+      "pricing": { "kind": "subscription", "inputPer1M": { "known": false }, "outputPer1M": { "known": false }, "planAmortizedPer1M": { "known": true, "value": 0.35 } }
+    },
+    {
+      "id": "codex-sol",
+      "provider": "codex-subscription",
+      "displayName": "Sol",
+      "tier": "large",
+      "maxContextTokens": 400000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["code-change", "debug", "plan", "review", "refactor"],
+      "weaknesses": [],
+      "pricing": { "kind": "subscription", "inputPer1M": { "known": false }, "outputPer1M": { "known": false }, "planAmortizedPer1M": { "known": true, "value": 0.5 } }
+    },
+    {
+      "id": "codex-astra",
+      "provider": "codex-subscription",
+      "displayName": "Astra",
+      "tier": "large",
+      "maxContextTokens": 1000000,
+      "supportsTools": ["bash", "read", "write", "edit"],
+      "strengths": ["plan", "debug", "review", "code-change"],
+      "weaknesses": [],
+      "pricing": { "kind": "subscription", "inputPer1M": { "known": false }, "outputPer1M": { "known": false }, "planAmortizedPer1M": { "known": true, "value": 0.8 } }
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "summarize-release-notes",
+      "source": "veto",
+      "task": { "kind": "summarize", "risk": "low", "objective": "Summarize the release notes in five bullets." },
+      "outcomes": { "cheap-small": { "success": true }, "balanced-mid": { "success": true }, "strong-large": { "success": true } },
+      "expect": { "complexity": "simple", "modelIdIn": ["or-granite-micro", "cheap-small", "balanced-mid", "strong-large"] }
+    },
+    {
+      "id": "debug-timeout",
+      "source": "veto",
+      "task": { "kind": "debug", "risk": "medium", "objective": "Find the cause of the timeout in the worker service." },
+      "outcomes": { "balanced-mid": { "success": false }, "strong-large": { "success": true } },
+      "expect": { "complexity": "moderate", "modelIdIn": ["strong-large"] }
+    },
+    {
+      "id": "small-code-change",
+      "source": "veto",
+      "task": { "kind": "code-change", "risk": "low", "objective": "Add a retry to the HTTP client." },
+      "outcomes": { "cheap-small": { "success": false }, "balanced-mid": { "success": true }, "strong-large": { "success": true } },
+      "expect": { "complexity": "simple", "modelIdIn": ["balanced-mid", "strong-large"] }
+    },
+    {
+      "id": "moderate-refactor",
+      "source": "veto",
+      "task": { "kind": "refactor", "risk": "medium", "objective": "Refactor the duplicated authentication handlers." },
+      "outcomes": { "balanced-mid": { "success": true }, "strong-large": { "success": true } },
+      "expect": { "complexity": "moderate", "modelIdIn": ["balanced-mid", "strong-large"] }
+    },
+    {
+      "id": "followup-code-change",
+      "source": "veto",
+      "task": { "kind": "code-change", "risk": "low", "objective": "Add input validation to the HTTP client." },
+      "outcomes": { "cheap-small": { "success": false }, "balanced-mid": { "success": true }, "strong-large": { "success": true } },
+      "expect": { "complexity": "simple", "modelIdIn": ["balanced-mid", "strong-large"] }
+    },
+    {
+      "id": "complex-plan",
+      "source": "veto",
+      "task": { "kind": "plan", "risk": "high", "maxCostUsd": 0.03, "objective": "Design a migration plan for the distributed event pipeline." },
+      "outcomes": { "strong-large": { "success": true } },
+      "note": "the $0.03 ceiling excludes strong-large (its real cost was $0.055); the router must find a large-tier candidate under the ceiling",
+      "expect": { "complexity": "complex", "modelIdIn": ["strong-large", "codex-sol", "codex-astra"] }
+    },
+    {
+      "id": "rename-variable",
+      "source": "switchyard",
+      "note": "trivial rename should land on the cheapest model declared capable of code-change. Not asserted in warm mode: history says every cheap code-change model in this corpus failed, and warm mode trusts history.",
+      "assertWarm": false,
+      "task": { "kind": "code-change", "risk": "low", "objective": "Rename the variable total to orderTotal in the checkout module." },
+      "expect": { "complexity": "simple", "modelIdIn": ["or-deepseek-v4-flash", "or-granite-micro", "cheap-small"] }
+    },
+    {
+      "id": "feature-plenty-of-quota",
+      "source": "switchyard",
+      "note": "quota far ahead of the window: subscription capacity is nearly free",
+      "assertWarm": false,
+      "task": { "kind": "code-change", "risk": "medium", "objective": "Implement pagination for the orders API endpoint." },
+      "capacity": {
+        "codex-luna": { "available": true, "usage": { "remainingFraction": 0.95, "windowElapsedFraction": 0.05, "source": "test" } },
+        "codex-terra": { "available": true, "usage": { "remainingFraction": 0.95, "windowElapsedFraction": 0.05, "source": "test" } }
+      },
+      "expect": { "complexity": "moderate", "modelIdIn": ["codex-luna", "codex-terra"] }
+    },
+    {
+      "id": "feature-quota-nearly-drained",
+      "source": "switchyard",
+      "note": "same task, quota nearly gone: the router must stop spending subscription capacity",
+      "assertWarm": false,
+      "task": { "kind": "code-change", "risk": "medium", "objective": "Implement pagination for the orders API endpoint." },
+      "capacity": {
+        "codex-luna": { "available": true, "usage": { "remainingFraction": 0.05, "windowElapsedFraction": 0.9, "source": "test" } },
+        "codex-terra": { "available": true, "usage": { "remainingFraction": 0.05, "windowElapsedFraction": 0.9, "source": "test" } }
+      },
+      "expect": { "complexity": "moderate", "modelIdIn": ["or-deepseek-v4-flash", "balanced-mid"] }
+    },
+    {
+      "id": "hard-deadlock-debug",
+      "source": "switchyard",
+      "note": "complex debugging: large tier only, subscription should beat a $15/M API model",
+      "assertWarm": false,
+      "task": { "kind": "debug", "risk": "high", "objective": "Debug the intermittent deadlock in the distributed event pipeline." },
+      "capacity": {
+        "codex-sol": { "available": true, "usage": { "remainingFraction": 0.6, "windowElapsedFraction": 0.4, "source": "test" } },
+        "codex-astra": { "available": true, "usage": { "remainingFraction": 0.6, "windowElapsedFraction": 0.4, "source": "test" } }
+      },
+      "expect": { "complexity": "complex", "modelIdIn": ["codex-sol", "codex-astra", "strong-large"] }
+    }
+  ]
+}
