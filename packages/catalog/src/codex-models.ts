@@ -1,5 +1,5 @@
 import { readFile } from "node:fs/promises";
-import type { ModelCapabilities } from "@switchyard/core";
+import type { ModelCapabilities } from "@vepando/switchyard-core";
 import { defaultCodexModels, type CodexModelSpec } from "./codex-subscription.js";
 
 /**

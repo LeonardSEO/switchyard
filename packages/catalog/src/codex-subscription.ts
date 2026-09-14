@@ -1,4 +1,4 @@
-import type { CapacityState, ModelCapabilities, Usage } from "@switchyard/core";
+import type { CapacityState, ModelCapabilities, Usage } from "@vepando/switchyard-core";
 
 /**
  * Codex subscription capacity (ChatGPT Plus/Pro).

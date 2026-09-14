@@ -1,4 +1,4 @@
-import type { RoutingSignal } from "@switchyard/core";
+import type { RoutingSignal } from "@vepando/switchyard-core";
 
 /**
  * Outcome store. This is what turns cold-start guessing into routing on

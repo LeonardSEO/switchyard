@@ -1,2 +1,2 @@
-export { buildSnapshot } from "@switchyard/catalog";
-export type { Snapshot } from "@switchyard/catalog";
+export { buildSnapshot } from "@vepando/switchyard-catalog";
+export type { Snapshot } from "@vepando/switchyard-catalog";

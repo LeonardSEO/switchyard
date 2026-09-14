@@ -1,4 +1,4 @@
-import type { CompletionFn, CompletionRequest, CompletionResult } from "@switchyard/core";
+import type { CompletionFn, CompletionRequest, CompletionResult } from "@vepando/switchyard-core";
 import type { PiContextLike } from "./pi.js";
 
 /**

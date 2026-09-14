@@ -7,7 +7,7 @@ import {
   type CatalogCache,
   type OpenRouterModel,
 } from "../src/index";
-import type { ModelCapabilities } from "@switchyard/core";
+import type { ModelCapabilities } from "@vepando/switchyard-core";
 
 const rawModel: OpenRouterModel = {
   id: "deepseek/deepseek-v4-flash-0731",

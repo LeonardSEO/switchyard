@@ -17,7 +17,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "name": "@switchyard/provider-openrouter",
+  "name": "@vepando/switchyard-provider-openrouter",
   "description": "Live OpenRouter catalog: models, prices, capabilities and benchmark scores",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -42,6 +42,6 @@
     "llm"
   ],
   "dependencies": {
-    "@switchyard/core": "^0.1.0"
+    "@vepando/switchyard-core": "^0.1.0"
   }
 }

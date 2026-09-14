@@ -17,7 +17,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "name": "@switchyard/core",
+  "name": "@vepando/switchyard-core",
   "description": "Pure routing core: classify, filter, score, decide. No I/O.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

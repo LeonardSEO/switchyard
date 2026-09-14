@@ -7,8 +7,8 @@
  */
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
-import { keywordClassification, route, type TaskSpec } from "@switchyard/core";
-import { signalsFromCatalog, stats } from "@switchyard/catalog";
+import { keywordClassification, route, type TaskSpec } from "@vepando/switchyard-core";
+import { signalsFromCatalog, stats } from "@vepando/switchyard-catalog";
 import { buildSnapshot } from "./build-catalog";
 
 const force = process.argv.includes("--force");

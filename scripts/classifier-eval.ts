@@ -17,8 +17,8 @@ import {
   pickCheapestClassifier,
   type Complexity,
   type TaskSpec,
-} from "@switchyard/core";
-import { OpenRouterSource, createOpenRouterCompletion } from "@switchyard/provider-openrouter";
+} from "@vepando/switchyard-core";
+import { OpenRouterSource, createOpenRouterCompletion } from "@vepando/switchyard-provider-openrouter";
 
 interface Scenario {
   id: string;

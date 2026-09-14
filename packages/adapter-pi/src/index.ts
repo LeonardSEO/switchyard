@@ -12,9 +12,9 @@ import {
   type CompletionFn,
   type ModelCapabilities,
   type RoutingSignal,
-} from "@switchyard/core";
-import type { Snapshot } from "@switchyard/catalog";
-import { signalsFromCatalog } from "@switchyard/catalog";
+} from "@vepando/switchyard-core";
+import type { Snapshot } from "@vepando/switchyard-catalog";
+import { signalsFromCatalog } from "@vepando/switchyard-catalog";
 import type { PiApiLike, PiContextLike, PiModelLike } from "./pi.js";
 import { matchPiModel } from "./pi.js";
 import { createPiCompletion } from "./completion.js";
@@ -160,7 +160,7 @@ export function createExtension(opts: AdapterOptions = {}) {
       if (!snapshotPromise) {
         snapshotPromise = opts.loadSnapshot
           ? opts.loadSnapshot()
-          : import("@switchyard/catalog").then((m) => m.buildSnapshot());
+          : import("@vepando/switchyard-catalog").then((m) => m.buildSnapshot());
       }
       return snapshotPromise;
     };

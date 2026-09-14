@@ -3,8 +3,8 @@ import type {
   ModelCapabilities,
   RoutingSignal,
   TaskKind,
-} from "@switchyard/core";
-import type { ModelSource, SourceResult } from "@switchyard/provider-openrouter";
+} from "@vepando/switchyard-core";
+import type { ModelSource, SourceResult } from "@vepando/switchyard-provider-openrouter";
 import { CodexSubscriptionSource } from "./codex-subscription.js";
 
 export interface SourceStatus {

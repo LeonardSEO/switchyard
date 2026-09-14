@@ -1,5 +1,5 @@
-import type { CapacityState, ModelCapabilities } from "@switchyard/core";
-import { OpenRouterSource } from "@switchyard/provider-openrouter";
+import type { CapacityState, ModelCapabilities } from "@vepando/switchyard-core";
+import { OpenRouterSource } from "@vepando/switchyard-provider-openrouter";
 import { CodexSubscriptionSource, type CodexSourceOptions } from "./codex-subscription.js";
 import { detectCodexEnvironment } from "./codex-subscription.js";
 import { loadCodexModels, resolveRoster, type CapabilityMatch } from "./codex-models.js";

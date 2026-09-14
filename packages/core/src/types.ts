@@ -1,5 +1,5 @@
 /**
- * Core domain types for @switchyard/core.
+ * Core domain types for @vepando/switchyard-core.
  *
  * Ported concepts from veto (github.com/oleg-koval/veto, Apache-2.0) with one
  * deliberate extension: capacity/quota is a first-class routing input, and

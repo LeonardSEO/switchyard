@@ -18,9 +18,9 @@ import {
   type Complexity,
   type ModelCapabilities,
   type TaskSpec,
-} from "@switchyard/core";
-import { OpenRouterSource } from "@switchyard/provider-openrouter";
-import { signalsFromCatalog } from "@switchyard/catalog";
+} from "@vepando/switchyard-core";
+import { OpenRouterSource } from "@vepando/switchyard-provider-openrouter";
+import { signalsFromCatalog } from "@vepando/switchyard-catalog";
 import { buildSnapshot } from "./build-catalog";
 
 const snapshot = await buildSnapshot();
@@ -144,7 +144,7 @@ const rungs: Array<[Complexity, string]> = [
   ["complex", "Debug the intermittent deadlock in the distributed event pipeline."],
   ["frontier", "Rewrite the billing service from scratch as a scalable event-driven system."],
 ];
-const showLadder = (label: string, capacity: Record<string, import("@switchyard/core").CapacityState>) => {
+const showLadder = (label: string, capacity: Record<string, import("@vepando/switchyard-core").CapacityState>) => {
   console.log(`\n${label}`);
   console.log(["rung", "chosen", "$/M", "cap", "effort", "adm", "cands"].join("\t"));
   for (const [rung, objective] of rungs) {
@@ -166,7 +166,7 @@ const showLadder = (label: string, capacity: Record<string, import("@switchyard/
   }
 };
 showLadder("with real codex quota (as measured):", snapshot.capacity);
-const drained: Record<string, import("@switchyard/core").CapacityState> = { ...snapshot.capacity };
+const drained: Record<string, import("@vepando/switchyard-core").CapacityState> = { ...snapshot.capacity };
 for (const id of ["codex-luna", "codex-terra", "codex-sol", "codex-astra"]) {
   drained[id] = { available: true, usage: { remainingFraction: 0.04, windowElapsedFraction: 0.85, source: "probe" } };
 }

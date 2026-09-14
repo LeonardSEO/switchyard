@@ -1,4 +1,4 @@
-import type { CompletionFn, CompletionRequest } from "@switchyard/core";
+import type { CompletionFn, CompletionRequest } from "@vepando/switchyard-core";
 
 /**
  * Minimal OpenRouter completion, used by the classifier and by evaluation

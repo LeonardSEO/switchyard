@@ -1,4 +1,4 @@
-import type { Classification } from "@switchyard/core";
+import type { Classification } from "@vepando/switchyard-core";
 
 /**
  * Small JSON stores under ~/.switchyard. Classification is on the critical path

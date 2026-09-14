@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Catalog, CodexSubscriptionSource, detectCodexEnvironment, signalsFromCatalog, stats } from "../src/index";
-import type { ModelSource, SourceResult } from "@switchyard/provider-openrouter";
-import type { ModelCapabilities } from "@switchyard/core";
+import type { ModelSource, SourceResult } from "@vepando/switchyard-provider-openrouter";
+import type { ModelCapabilities } from "@vepando/switchyard-core";
 
 const model = (id: string, provider: string, tier: string, price?: number, score?: number): ModelCapabilities => ({
   id,

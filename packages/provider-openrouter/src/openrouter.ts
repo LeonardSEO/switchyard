@@ -1,5 +1,5 @@
-import type { Known, ModelCapabilities, TaskKind, Tier } from "@switchyard/core";
-import { known, unknown } from "@switchyard/core";
+import type { Known, ModelCapabilities, TaskKind, Tier } from "@vepando/switchyard-core";
+import { known, unknown } from "@vepando/switchyard-core";
 
 /**
  * OpenRouter catalog source.

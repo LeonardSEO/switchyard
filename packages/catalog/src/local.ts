@@ -1,5 +1,5 @@
-import type { ModelCapabilities } from "@switchyard/core";
-import type { ModelSource, SourceResult } from "@switchyard/provider-openrouter";
+import type { ModelCapabilities } from "@vepando/switchyard-core";
+import type { ModelSource, SourceResult } from "@vepando/switchyard-provider-openrouter";
 
 /**
  * Any OpenAI-compatible endpoint that lists its models: Ollama, LM Studio,

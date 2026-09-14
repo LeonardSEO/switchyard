@@ -18,9 +18,9 @@ import {
   type Complexity,
   type ModelCapabilities,
   type TaskSpec,
-} from "@switchyard/core";
-import { OpenRouterSource } from "@switchyard/provider-openrouter";
-import { signalsFromCatalog } from "@switchyard/catalog";
+} from "@vepando/switchyard-core";
+import { OpenRouterSource } from "@vepando/switchyard-provider-openrouter";
+import { signalsFromCatalog } from "@vepando/switchyard-catalog";
 import { buildSnapshot } from "./build-catalog";
 
 const snapshot = await buildSnapshot();

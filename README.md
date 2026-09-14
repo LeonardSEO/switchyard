@@ -108,7 +108,7 @@ classifier. Do not ship a router that only has cold-start behaviour.
 
 ## Pi adapter
 
-`@switchyard/adapter-pi` runs the router inside [pi](https://pi.dev). It does not
+`@vepando/switchyard` runs the router inside [pi](https://pi.dev). It does not
 become the coding agent: pi keeps its permissions, tools, MCP, sessions and
 authentication. The adapter only answers two questions per turn — which model,
 and how hard it should think — then records what happened.
@@ -165,8 +165,8 @@ and failure fallback. `escalation: "never"` keeps every objective local.
 ## Next
 
 
-1. `@switchyard/provider-openrouter` — dynamic catalog, prices, capacity.
-2. `@switchyard/adapter-pi` — `pi.registerProvider` + `before_provider_request`,
+1. `@vepando/switchyard-provider-openrouter` — dynamic catalog, prices, capacity.
+2. `@vepando/switchyard` — `pi.registerProvider` + `before_provider_request`,
    no localhost gateway needed for pi.
 3. `@switchyard/adapter-opencode` — npm plugin.
 4. `@switchyard/gateway` — local `/v1` fallback for every other harness.

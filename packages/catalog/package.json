@@ -17,7 +17,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "name": "@switchyard/catalog",
+  "name": "@vepando/switchyard-catalog",
   "description": "Merges every model source into one candidate pool, with real subscription quota",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -43,7 +43,7 @@
     "llm"
   ],
   "dependencies": {
-    "@switchyard/core": "^0.1.0",
-    "@switchyard/provider-openrouter": "^0.1.0"
+    "@vepando/switchyard-core": "^0.1.0",
+    "@vepando/switchyard-provider-openrouter": "^0.1.0"
   }
 }

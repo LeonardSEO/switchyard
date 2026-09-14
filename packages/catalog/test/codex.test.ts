@@ -6,7 +6,7 @@ import {
   readCodexUsage,
 } from "../src/codex-usage";
 import { defaultCodexModels, matchCapability, resolveRoster } from "../src/index";
-import type { ModelCapabilities } from "@switchyard/core";
+import type { ModelCapabilities } from "@vepando/switchyard-core";
 
 const auth = {
   auth_mode: "chatgpt",

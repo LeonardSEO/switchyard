@@ -17,7 +17,7 @@
   "publishConfig": {
     "access": "public"
   },
-  "name": "@switchyard/adapter-pi",
+  "name": "@vepando/switchyard",
   "description": "Route every Pi turn to the right model, including the subscription you already pay for",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -54,7 +54,7 @@
     ]
   },
   "dependencies": {
-    "@switchyard/catalog": "^0.1.0",
-    "@switchyard/core": "^0.1.0"
+    "@vepando/switchyard-catalog": "^0.1.0",
+    "@vepando/switchyard-core": "^0.1.0"
   }
 }

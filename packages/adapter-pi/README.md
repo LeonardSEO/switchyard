@@ -1,4 +1,4 @@
-# @switchyard/adapter-pi
+# @vepando/switchyard
 
 A [pi](https://pi.dev) package that routes every turn to the right model —
 including the Codex or Claude subscription you already pay for.
@@ -9,7 +9,7 @@ which model, and how hard it should think. Then it records what happened, so
 later turns route on evidence instead of on prices.
 
 ```bash
-pi install npm:@switchyard/adapter-pi
+pi install npm:@vepando/switchyard
 ```
 
 ## What it decides

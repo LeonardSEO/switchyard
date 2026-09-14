@@ -1,4 +1,4 @@
-import type { ModelCapabilities } from "@switchyard/core";
+import type { ModelCapabilities } from "@vepando/switchyard-core";
 
 /**
  * Structural types for the bits of Pi's extension API we use.

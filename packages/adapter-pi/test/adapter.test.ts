@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { CapacityState, ModelCapabilities } from "@switchyard/core";
+import type { CapacityState, ModelCapabilities } from "@vepando/switchyard-core";
 import { createExtension, matchPiModel, judgeRun, readOutcomes, signalsFromOutcomes } from "../src/index";
 import type { PiApiLike, PiContextLike, PiModelLike } from "../src/pi";
 

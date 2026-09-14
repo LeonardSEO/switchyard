@@ -1,6 +1,6 @@
 import { homedir } from "node:os";
 import { join } from "node:path";
-import type { Usage } from "@switchyard/core";
+import type { Usage } from "@vepando/switchyard-core";
 
 /**
  * Real Codex quota, read the way the Codex CLI itself reads it.
