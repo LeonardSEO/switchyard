@@ -162,6 +162,19 @@ So the adapter classifies with a model by default (`escalation: "always"`),
 cached and budgeted at $0.001 per call, with the keyword answer as the offline
 and failure fallback. `escalation: "never"` keeps every objective local.
 
+## OpenCode and any other harness
+
+`@vepando/switchyard-opencode` is an OpenCode plugin, and
+`@vepando/switchyard-gateway` is the OpenAI-compatible endpoint behind it. Any
+tool that speaks the OpenAI API can use the gateway with model
+`switchyard/auto` — OpenCode via a custom provider, Cursor, Cline, aider, curl.
+
+```bash
+OPENROUTER_API_KEY=... npx @vepando/switchyard-gateway
+```
+
+Decisions come back on `x-switchyard-model` and `x-switchyard-complexity`.
+
 ## Next
 
 

@@ -1,0 +1,23 @@
+{
+  "name": "@vepando/switchyard-opencode",
+  "version": "0.1.0",
+  "license": "Apache-2.0",
+  "type": "module",
+  "author": "LeonardSEO",
+  "description": "OpenCode plugin: route every prompt through Switchyard",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
+  "files": ["dist", "src", "README.md"],
+  "scripts": { "build": "tsc -p tsconfig.build.json", "prepare": "npm run build" },
+  "keywords": ["pi-package", "opencode", "opencode-plugin", "model-router", "llm"],
+  "repository": { "type": "git", "url": "git+https://github.com/LeonardSEO/switchyard.git" },
+  "homepage": "https://github.com/LeonardSEO/switchyard#readme",
+  "engines": { "node": ">=20" },
+  "publishConfig": { "access": "public" },
+  "dependencies": {
+    "@vepando/switchyard-core": "^0.1.0",
+    "@vepando/switchyard-catalog": "^0.1.0",
+    "@vepando/switchyard-gateway": "^0.1.0"
+  }
+}
