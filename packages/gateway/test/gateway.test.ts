@@ -120,3 +120,37 @@ describe("gateway server", () => {
     expect(res.status).toBe(503);
   });
 });
+
+describe("openrouter attribution", () => {
+  it("sends X-Title and HTTP-Referer upstream on every request", async () => {
+    const seen: Array<{ title?: string; referer?: string }> = [];
+    const echo = createServer((req, res) => {
+      seen.push({
+        title: req.headers["x-title"] as string | undefined,
+        referer: req.headers["http-referer"] as string | undefined,
+      });
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { content: "ok" } }] }));
+    });
+    await new Promise<void>((r) => echo.listen(0, "127.0.0.1", r));
+    servers.push(echo);
+    const port = (echo.address() as { port: number }).port;
+
+    gateway = await createGateway({
+      models: pool,
+      upstreamBaseUrl: `http://127.0.0.1:${port}/v1`,
+      apiKey: "k",
+    });
+    await fetch(`http://127.0.0.1:${gateway.port}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "switchyard/auto",
+        messages: [{ role: "user", content: "Fix the typo in the README" }],
+      }),
+    }).then((r) => r.json());
+
+    expect(seen[0].title).toBeTruthy();
+    expect(seen[0].referer).toContain("github.com");
+  });
+});
