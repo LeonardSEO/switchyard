@@ -17,6 +17,24 @@ export interface PiModelLike {
 export interface PiModelRegistryLike {
   getAvailable(): PiModelLike[];
   find?(provider: string, id: string): PiModelLike | undefined;
+  /**
+   * Resolved credential, headers and base URL for a provider. Async in Pi, and
+   * shaped `{ auth: { apiKey, headers, baseUrl } }`. This is how the adapter
+   * avoids ever asking the user for a second API key.
+   */
+  getProviderAuth?(providerId: string): Promise<ProviderAuthResultLike | undefined>;
+  getApiKeyForProvider?(providerId: string): Promise<string | undefined>;
+}
+
+export interface ResolvedAuthLike {
+  apiKey?: string;
+  headers?: Record<string, string>;
+  baseUrl?: string;
+}
+
+export interface ProviderAuthResultLike {
+  auth?: ResolvedAuthLike;
+  source?: string;
 }
 
 export interface PiContextLike {

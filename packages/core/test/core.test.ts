@@ -6,6 +6,7 @@ import {
   effectiveInputPer1M,
   filterCandidates,
   inferKind,
+  classificationCost,
   isUncertain,
   keywordClassification,
   ModelClassifier,
@@ -282,6 +283,18 @@ describe("classifier", () => {
     expect(keywordClassification({ objective: "implement service" }).score).toBe(uncertain.score);
     expect(out.degraded).toBe(true);
     expect(out.complexity).toBe("moderate");
+  });
+
+  it("costs the classification prompt, not the whole task context", () => {
+    const cheapModel = api("cheap-classifier", "small", 0.02, 0.08);
+    const small = classificationCost(cheapModel, { objective: "rename a variable" });
+    const huge = classificationCost(cheapModel, {
+      objective: "rename a variable",
+      contextTokens: 200_000,
+    });
+    // A 200k-token context must not change what the classifier call costs.
+    expect(huge).toBeCloseTo(small);
+    expect(small).toBeLessThan(0.00001);
   });
 
   it("uses the model answer and caches it", async () => {

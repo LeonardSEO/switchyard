@@ -110,6 +110,11 @@ export interface ClassifierFloors {
   requireBenchmark?: boolean;
   /** Minimum published capability (0..1) for the classifier. */
   minCapabilityScore?: number;
+  /**
+   * Reasoning models spend their output budget thinking and return null
+   * content, which is useless for a one-line JSON answer. Off by default.
+   */
+  allowReasoning?: boolean;
 }
 
 export const defaultClassifierFloors: ClassifierFloors = {
@@ -117,6 +122,7 @@ export const defaultClassifierFloors: ClassifierFloors = {
   requireStructuredOutput: true,
   allowFreeTier: false,
   allowBatch: false,
+  allowReasoning: false,
   requireBenchmark: true,
   minCapabilityScore: 0.2,
 };
@@ -143,6 +149,8 @@ export function pickCheapestClassifier(
     if (!floors.allowFreeTier && m.freeTier) continue;
     if (!floors.allowBatch && m.batchOnly) continue;
     if (floors.requireStructuredOutput && m.capabilities?.structuredOutput !== true) continue;
+    // A reasoning model burns the output budget on thinking and answers null.
+    if (!floors.allowReasoning && m.capabilities?.reasoning === true) continue;
     // Unmeasured means unknown, and unknown cannot be trusted with the
     // decision that gates every other decision.
     if (floors.requireBenchmark !== false) {
@@ -225,10 +233,11 @@ export class ModelClassifier implements Classifier {
       pickCheapestClassifier(this.opts.models, this.floors);
     if (!model) return base;
 
-    const est = estimateTokens(task, undefined);
-    const approxCost =
-      ((est.input / 1_000_000) * (model.pricing.inputPer1M.known ? model.pricing.inputPer1M.value : 0)) +
-      ((est.output / 1_000_000) * (model.pricing.outputPer1M.known ? model.pricing.outputPer1M.value : 0));
+    // Cost the classification prompt, not the task. The classifier only sends
+    // the system prompt plus the objective — never the repository context — so
+    // charging it the task's token estimate inflates it ~100x and the savings
+    // gate then refuses to escalate for anything.
+    const approxCost = classificationCost(model, task);
     if (approxCost > this.maxCostUsd) return base;
 
     const saving = expectedTierSaving(task, base.complexity, this.opts.models);
@@ -239,7 +248,7 @@ export class ModelClassifier implements Classifier {
         model,
         system: CLASSIFIER_SYSTEM,
         user: task.objective,
-        maxOutputTokens: 120,
+        maxOutputTokens: 400,
       });
       const parsed = parseClassification(res.text);
       if (!parsed) return { ...base, degraded: true };
@@ -287,6 +296,16 @@ export function expectedTierSaving(
 
   const { input, output } = estimateTokens(task, undefined);
   return ((input / 1_000_000) + (output / 1_000_000)) * (up - here);
+}
+
+/** What the classification call actually costs: system prompt + objective. */
+export function classificationCost(model: ModelCapabilities, task: TaskSpec): number {
+  const promptTokens =
+    Math.ceil((CLASSIFIER_SYSTEM.length + task.objective.length) / 4) + 16;
+  const outputTokens = 80;
+  const inputPrice = model.pricing.inputPer1M.known ? model.pricing.inputPer1M.value : 0;
+  const outputPrice = model.pricing.outputPer1M.known ? model.pricing.outputPer1M.value : 0;
+  return (promptTokens / 1_000_000) * inputPrice + (outputTokens / 1_000_000) * outputPrice;
 }
 
 function parseClassification(text: string): {

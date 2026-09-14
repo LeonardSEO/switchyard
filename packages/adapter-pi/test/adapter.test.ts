@@ -72,6 +72,37 @@ const snapshotOf = (
   codexRoster: "default" as const,
 });
 
+const classifierModel = (
+  id: string,
+  price: number,
+  capability: number,
+  tier: "mid" | "large" = "mid",
+): ModelCapabilities => ({
+  id,
+  provider: "openrouter",
+  tier,
+  capabilityScore: capability,
+  maxContextTokens: 100_000,
+  capabilities: { structuredOutput: true, toolCalling: true },
+  pricing: {
+    kind: "api",
+    inputPer1M: { known: true, value: price },
+    outputPer1M: { known: true, value: price * 4 },
+  },
+});
+
+function fakeCtxWithAuth(auth: { apiKey?: string; baseUrl?: string }) {
+  const captured: { url?: string; headers?: Record<string, string>; body?: string } = {};
+  const ctx: PiContextLike = {
+    modelRegistry: {
+      getAvailable: () => [],
+      getProviderAuth: async () => ({ auth }),
+    },
+    ui: { notify: () => {} },
+  };
+  return { ctx, captured };
+}
+
 const files: string[] = [];
 const tempFile = () => {
   const path = join(tmpdir(), `switchyard-outcomes-${Math.random().toString(36).slice(2)}.jsonl`);
@@ -180,5 +211,155 @@ describe("pi adapter", () => {
     expect(judgeRun([{ role: "assistant", stopReason: "length" }])).toBe(false);
     expect(judgeRun([{ role: "assistant", stopReason: "stop" }])).toBe(true);
     expect(judgeRun([])).toBe(false);
+  });
+});
+
+describe("classifier escalation", () => {
+  const uncertain = "implement service";
+  const certain = "create a simple hello world page";
+
+  it("escalates to a cheap model only when the keyword answer is uncertain, using Pi's credentials", async () => {
+    const { ctx, captured } = fakeCtxWithAuth({
+      apiKey: "pi-key",
+      baseUrl: "https://example.test/v1",
+    });
+    // The same registry must offer both runnable models and the credential.
+    ctx.modelRegistry.getAvailable = () => [
+      { id: "cheap/classifier", provider: "openrouter" },
+      { id: "deepseek/deepseek-v4-flash-0731", provider: "openrouter" },
+    ];
+    const { pi, handlers } = fakePi([]);
+    // A large-tier option is what makes escalation worth paying for: without
+    // one, getting the rung right saves nothing.
+    const snapshot = snapshotOf([
+      classifierModel("cheap/classifier", 0.01, 0.55),
+      classifierModel("deepseek/deepseek-v4-flash-0731", 0.06, 0.691),
+      classifierModel("frontier/large", 3, 0.8, "large"),
+    ]);
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (url: unknown, init: unknown) => {
+      const request = init as { headers: Record<string, string>; body: string };
+      captured.url = String(url);
+      captured.headers = request.headers;
+      captured.body = request.body;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [
+            {
+              message: {
+                content: '{"kind":"code-change","complexity":"complex","confidence":0.91}',
+              },
+            },
+          ],
+          usage: { prompt_tokens: 900, completion_tokens: 40 },
+        }),
+      } as unknown as Response;
+    }) as typeof fetch;
+
+    try {
+      createExtension({
+        loadSnapshot: async () => snapshot,
+        outcomeFile: tempFile(),
+        quiet: true,
+      })(pi);
+      await handlers.before_agent_start!({ prompt: uncertain }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    // It escalated, and it used Pi's key rather than a second credential.
+    expect(captured.headers?.authorization).toBe("Bearer pi-key");
+    expect(captured.url).toBe("https://example.test/v1/chat/completions");
+    expect(captured.body).toContain("cheap/classifier");
+  });
+
+  it("does not call a model when the deterministic answer is confident", async () => {
+    let called = false;
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      called = true;
+      return { ok: true, status: 200, json: async () => ({ choices: [] }) } as unknown as Response;
+    }) as typeof fetch;
+    try {
+      const { pi, ctx, handlers } = fakePi([{ id: "cheap/classifier", provider: "openrouter" }]);
+      createExtension({
+        loadSnapshot: async () => snapshotOf([classifierModel("cheap/classifier", 0.01, 0.55)]),
+        outcomeFile: tempFile(),
+        quiet: true,
+      })(pi);
+      await handlers.before_agent_start!({ prompt: certain }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    expect(called).toBe(false);
+  });
+
+  it("falls back to the deterministic answer when the classifier call fails", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => {
+      throw new Error("offline");
+    }) as typeof fetch;
+    try {
+      const { pi, ctx, handlers, calls } = fakePi([
+        { id: "cheap/classifier", provider: "openrouter" },
+        { id: "deepseek/deepseek-v4-flash-0731", provider: "openrouter" },
+      ]);
+      createExtension({
+        loadSnapshot: async () =>
+          snapshotOf([
+            classifierModel("cheap/classifier", 0.01, 0.55),
+            classifierModel("deepseek/deepseek-v4-flash-0731", 0.06, 0.691),
+            classifierModel("frontier/large", 3, 0.8, "large"),
+          ]),
+        outcomeFile: tempFile(),
+        quiet: false,
+      })(pi);
+      await handlers.before_agent_start!({ prompt: uncertain }, ctx);
+      // Still routed something: a failed classifier must not break the turn.
+      expect(calls.model).toBeDefined();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+});
+
+describe("classifier call shape", () => {
+  it("switches reasoning off when the classifier is a reasoning model", async () => {
+    const { ctx, captured } = fakeCtxWithAuth({ apiKey: "k", baseUrl: "https://example.test/v1" });
+    ctx.modelRegistry.getAvailable = () => [{ id: "thinking/cheap", provider: "openrouter" }];
+    const { pi, handlers } = fakePi([]);
+    const thinking = classifierModel("thinking/cheap", 0.02, 0.55);
+    thinking.capabilities = { structuredOutput: true, toolCalling: true, reasoning: true };
+
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (_url: unknown, init: unknown) => {
+      captured.body = (init as { body: string }).body;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: '{"kind":"code-change","complexity":"complex"}' } }],
+        }),
+      } as unknown as Response;
+    }) as typeof fetch;
+
+    try {
+      createExtension({
+        loadSnapshot: async () =>
+          snapshotOf([thinking, classifierModel("frontier/large", 3, 0.8, "large")]),
+        outcomeFile: tempFile(),
+        quiet: true,
+      })(pi);
+      await handlers.before_agent_start!({ prompt: "implement service" }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(captured.body).toContain('"reasoning"');
+    expect(captured.body).toContain('"minimal"');
+    expect(captured.body).toContain("thinking/cheap");
   });
 });

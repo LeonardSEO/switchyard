@@ -1,7 +1,12 @@
 import {
   effectiveInputPer1M,
-  keywordClassification,
+  KeywordClassifier,
+  ModelClassifier,
+  defaultClassifierFloors,
+  pickCheapestClassifier,
   route,
+  type Classification,
+  type Classifier,
   type ModelCapabilities,
   type RoutingSignal,
 } from "@switchyard/core";
@@ -9,6 +14,7 @@ import type { Snapshot } from "@switchyard/catalog";
 import { signalsFromCatalog } from "@switchyard/catalog";
 import type { PiApiLike, PiContextLike, PiModelLike } from "./pi";
 import { matchPiModel } from "./pi";
+import { createPiCompletion } from "./completion";
 import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes";
 
 export * from "./pi";
@@ -27,6 +33,7 @@ interface PendingRun {
   kind: string;
   complexity: string;
   effort: string;
+  classifier?: string;
 }
 
 /**
@@ -42,6 +49,36 @@ export function createExtension(opts: AdapterOptions = {}) {
     let snapshotPromise: Promise<Snapshot> | undefined;
     let availableCache: PiModelLike[] = [];
     let pending: PendingRun | undefined;
+    let classifierPromise: Promise<Classifier> | undefined;
+
+    /**
+     * The classifier escalates to a cheap model only when the deterministic
+     * answer is uncertain, so most turns cost nothing extra. It borrows Pi's
+     * credentials rather than introducing an API key of its own.
+     */
+    const getClassifier = (ctx: PiContextLike, snap: Snapshot): Promise<Classifier> => {
+      if (!classifierPromise) {
+        classifierPromise = (async () => {
+          const apiModels = snap.models.filter((m) => m.pricing.kind === "api");
+          // Below ~0.5 the models guess rather than follow the schema, and the
+          // rung they pick is what every other decision hangs on.
+          const picked = pickCheapestClassifier(apiModels, {
+            ...defaultClassifierFloors,
+            minCapabilityScore: 0.5,
+            // Nearly everything capable is a reasoning model now; the call
+            // itself switches reasoning off rather than excluding them.
+            allowReasoning: true,
+          });
+          if (!picked) return new KeywordClassifier();
+          return new ModelClassifier({
+            models: apiModels,
+            complete: createPiCompletion(ctx),
+            modelId: picked.id,
+          });
+        })();
+      }
+      return classifierPromise;
+    };
 
     const load = (): Promise<Snapshot> => {
       if (!snapshotPromise) {
@@ -75,7 +112,9 @@ export function createExtension(opts: AdapterOptions = {}) {
       }
       if (routable.length === 0) return;
 
-      const classification = keywordClassification({ objective });
+      const classification = await getClassifier(ctx, snapshot).then((c) =>
+        c.classify({ objective }),
+      );
       const outcomes = await readOutcomes(opts.outcomeFile);
       const signals: Record<string, RoutingSignal> = {
         ...signalsFromCatalog(snapshot.models),
@@ -93,6 +132,9 @@ export function createExtension(opts: AdapterOptions = {}) {
         kind: decision.kind,
         complexity: decision.complexity,
         effort: decision.effort,
+        classifier: classification.degraded
+          ? `${classification.source}:degraded`
+          : classification.source,
       };
 
       try {
@@ -127,6 +169,7 @@ export function createExtension(opts: AdapterOptions = {}) {
           kind: run.kind,
           complexity: run.complexity,
           effort: run.effort,
+          classifier: run.classifier,
           success: judgeRun(event?.messages ?? []),
           at: Date.now(),
         },
@@ -139,7 +182,7 @@ export function createExtension(opts: AdapterOptions = {}) {
 function routeSafely(
   objective: string,
   routable: ModelCapabilities[],
-  classification: ReturnType<typeof keywordClassification>,
+  classification: Classification,
   snapshot: Snapshot,
   signals: Record<string, RoutingSignal>,
 ) {

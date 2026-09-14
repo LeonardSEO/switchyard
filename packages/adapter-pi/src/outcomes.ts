@@ -14,6 +14,8 @@ export interface Outcome {
   kind: string;
   complexity: string;
   effort?: string;
+  /** Which classifier decided the rung: keyword, model, explicit, or degraded. */
+  classifier?: string;
   success: boolean;
   at: number;
 }
