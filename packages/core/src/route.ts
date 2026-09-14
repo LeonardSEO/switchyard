@@ -11,6 +11,7 @@ import type { Classification } from "./classifier";
 import { filterCandidates, type FilterContext, type PrunedCandidate } from "./filter";
 import {
   defaultWeights,
+  DEMAND_BY_COMPLEXITY,
   effortForComplexity,
   scoreCandidate,
   type Weights,
@@ -23,6 +24,10 @@ export interface RankedCandidate {
   costFit: number;
   kindMatch: number;
   estCostUsd: Known<number>;
+  pFail: number;
+  expectedCostUsd: Known<number>;
+  qualityScore: number;
+  reliability: number;
 }
 
 export interface RouteDecision {
@@ -43,7 +48,24 @@ export interface RouteOptions extends FilterContext {
   weights?: Partial<Weights>;
   /** Score gap below which admission is required. */
   admissionMargin?: number;
+  /**
+   * Cost of one failed attempt, by task risk. Only used when the task does not
+   * declare `failureCostUsd` itself. Set any entry to 0 to go back to
+   * cheapest-viable-first for that risk level.
+   */
+  failureCostByRisk?: Partial<Record<"low" | "medium" | "high", number>>;
 }
+
+/**
+ * A failed trivial task costs a retry. A failed rewrite costs the afternoon.
+ * Without this the cheapest model always wins, which is only right when failure
+ * is free — and for a rewrite it is not.
+ */
+export const DEFAULT_FAILURE_COST_BY_RISK: Record<string, number> = {
+  low: 1,
+  medium: 5,
+  high: 25,
+};
 
 export function route(
   task: TaskSpec,
@@ -55,7 +77,13 @@ export function route(
   const weights: Weights = { ...defaultWeights, ...opts.weights };
   const { kind, complexity } = classification;
 
-  const { survivors, pruned } = filterCandidates(task, kind, complexity, models, opts);
+  const failureCost =
+    task.failureCostUsd ??
+    (opts.failureCostByRisk ?? DEFAULT_FAILURE_COST_BY_RISK)[task.risk ?? "low"] ??
+    DEFAULT_FAILURE_COST_BY_RISK.low;
+  const priced: TaskSpec = { ...task, failureCostUsd: failureCost };
+
+  const { survivors, pruned } = filterCandidates(priced, kind, complexity, models, opts);
 
   const ranked: RankedCandidate[] = survivors
     .map((m) => {
@@ -66,13 +94,14 @@ export function route(
           | RoutingSignal
           | undefined;
       const s = scoreCandidate(
-        task,
+        priced,
         kind,
         m,
         opts.capacity?.[m.id],
         signal,
         cfg,
         weights,
+        DEMAND_BY_COMPLEXITY[complexity] ?? DEMAND_BY_COMPLEXITY.moderate,
       );
       return {
         model: m,
@@ -80,9 +109,35 @@ export function route(
         costFit: s.costFit,
         kindMatch: s.kindMatch,
         estCostUsd: s.estCostUsd,
+        pFail: s.pFail,
+        expectedCostUsd: s.expectedCostUsd,
+        qualityScore: s.qualityScore,
+        reliability: s.reliability,
       };
     })
     .sort((a, b) => b.score - a.score);
+
+  // Relative expected cost. An absolute fit normalised against the failure cost
+  // compresses every candidate to ~0.99 once failure is cheap, which quietly
+  // hands the decision to raw capability and always picks the frontier model.
+  // Expressing cost as a ratio to the best candidate keeps the axis meaningful
+  // at every scale: twice the expected cost halves the cost term.
+  const expectedCosts = ranked
+    .map((r) => r.expectedCostUsd)
+    .filter((e): e is { known: true; value: number } => e.known && e.value >= 0)
+    .map((e) => e.value);
+  if (failureCost > 0 && expectedCosts.length > 1) {
+    const best = Math.min(...expectedCosts);
+    for (const r of ranked) {
+      const e = r.expectedCostUsd;
+      if (!e.known) continue;
+      const relative = e.value <= 0 ? 1 : Math.min(1, best / e.value);
+      const previous = r.costFit;
+      r.costFit = relative;
+      r.score = (r.qualityScore - previous * weights.cost + relative * weights.cost) * r.reliability;
+    }
+    ranked.sort((a, b) => b.score - a.score);
+  }
 
   const top = ranked[0]?.model ?? null;
   const margin =

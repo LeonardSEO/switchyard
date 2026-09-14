@@ -145,17 +145,18 @@ for (const c of cases) {
   const optimal = isParetoOptimal(chosen, d.ranked.map((r) => r.model), axes);
   check(optimal, "on the price/quality frontier", optimal ? "non-dominated" : "dominated");
 
-  // Free tiers are excluded from the reference: \$0 makes any ratio meaningless.
-  const paidPrices = d.ranked
-    .map((r) => r.model)
-    .filter((m) => !m.freeTier)
-    .map(axes.price)
-    .filter((p): p is number => p !== undefined);
-  const cheapest = paidPrices.length ? Math.min(...paidPrices) : undefined;
+  // The real invariant now: no other candidate has a lower expected cost once
+  // the price of failure is included. Cheapest-per-token is not the goal.
+  const expected = d.ranked
+    .map((r) => r.expectedCostUsd)
+    .filter((e): e is { known: true; value: number } => e.known);
+  const bestExpected = expected.length ? Math.min(...expected.map((e) => e.value)) : undefined;
+  const chosenExpected = d.ranked.find((r) => r.model.id === chosen.id)?.expectedCostUsd;
   check(
-    price === undefined || cheapest === undefined || price <= cheapest * 3,
-    "within 3x of cheapest paid",
-    `$${price?.toFixed(3) ?? "?"} vs $${cheapest?.toFixed(3) ?? "n/a"}`,
+    bestExpected === undefined ||
+      (chosenExpected?.known && chosenExpected.value <= bestExpected * 1.0001),
+    "lowest expected cost",
+    `$${(chosenExpected?.known ? chosenExpected.value : 0).toFixed(3)} vs best $${bestExpected?.toFixed(3) ?? "?"}`,
   );
 
   if (c.expectProviderNot) {

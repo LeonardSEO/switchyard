@@ -142,6 +142,26 @@ for (const c of ["simple", "moderate", "complex"] as const) {
   );
 }
 
+// ---------------------------------------------------------------- 6
+console.log("\n=== 6. cost of failure (30k context, realistic agent session) ===");
+const CTX = 30_000;
+for (const [label, task] of tasks.filter(([l]) =>
+  ["rename variable", "full rewrite", "deadlock debug"].includes(l),
+)) {
+  for (const failureCost of [0, 5, 25, 100]) {
+    const t: TaskSpec = { ...task, contextTokens: CTX, failureCostUsd: failureCost };
+    const cls = keywordClassification(t);
+    const d = route(t, models, cls, { capacity: snapshot.capacity, signals });
+    const top = d.ranked[0];
+    const exp = top?.expectedCostUsd;
+    console.log(
+      `${label.padEnd(18)} failure=$${String(failureCost).padStart(3)}  -> ${(d.model?.id ?? "none").padEnd(38)}` +
+        ` pFail=${(top?.pFail ?? 0).toFixed(2)}  expected=$${(exp?.known ? exp.value.toFixed(2) : "?").padStart(6)}` +
+        `  tokens=$${(top?.estCostUsd.known ? top.estCostUsd.value.toFixed(4) : "?")}`,
+    );
+  }
+}
+
 // ---------------------------------------------------------------- 5
 console.log("\n=== 5. :free and :batch ===");
 const free = models.filter((m) => m.freeTier);

@@ -7,6 +7,60 @@ export const REFERENCE_INPUT_PER_1M = 15;
 /** Price at which a model is considered as cheap as it can usefully get. */
 export const CHEAP_FLOOR_PER_1M = 0.01;
 
+/**
+ * How much capability a task demands, by inferred complexity. Failure is the
+ * gap between what a task demands and what a model can do — not the model's
+ * absolute score. A weak model is perfectly reliable at a trivial rename.
+ */
+export const DEMAND_BY_COMPLEXITY: Record<string, number> = {
+  simple: 0.25,
+  moderate: 0.5,
+  complex: 0.75,
+};
+
+/**
+ * Probability that an attempt fails, from the gap between demand and measured
+ * capability. Unmeasured capability is treated as mediocre rather than average:
+ * unknown is not neutral.
+ */
+export function failureProbability(
+  quality: number | undefined,
+  demand: number,
+  temperature = 0.12,
+): number {
+  const q = quality ?? 0.4;
+  return 1 / (1 + Math.exp(-(demand - q) / temperature));
+}
+
+/** Cost of one attempt, including the cost of it going wrong. */
+export function expectedCostUsd(
+  estCost: Known<number>,
+  pFail: number,
+  failureCostUsd: number,
+): Known<number> {
+  if (!estCost.known) return { known: false, reason: "cost unknown" };
+  return known(estCost.value + pFail * failureCostUsd);
+}
+
+/**
+ * Cost fit in absolute expected dollars: an attempt that costs twice as much as
+ * a failure scores zero.
+ *
+ * Two properties matter here. It compares dollars, so $0.001 and $0.45 stay a
+ * real difference rather than collapsing into a tie. And it scales with the
+ * declared failure cost, so when failure is cheap, token price decides, and when
+ * failure is expensive, the failure term decides.
+ */
+export function costFitExpected(
+  expectedTotal: Known<number>,
+  failureCostUsd: number,
+): number {
+  if (!expectedTotal.known) return 0.05;
+  const reference = failureCostUsd * 2;
+  if (reference <= 0) return 1;
+  return Math.max(0.05, 1 - expectedTotal.value / reference);
+}
+
 export interface Weights {
   cost: number;
   success: number;
@@ -31,6 +85,13 @@ export function kindMatch(m: ModelCapabilities, kind: TaskKind): number {
 }
 
 /**
+ * Context a coding agent actually sends: system prompt, tool schemas, repo
+ * context, session history. Calibrating this too low makes token cost look
+ * irrelevant next to failure cost and sends every task to the frontier model.
+ */
+export const DEFAULT_CONTEXT_TOKENS = 24_000;
+
+/**
  * Token estimate. Historical averages win; otherwise fall back to veto's shape
  * (input dominated by prompt, output ~10% of input) with a floor.
  */
@@ -40,7 +101,8 @@ export function estimateTokens(
 ): { input: number; output: number } {
   const input = Math.max(
     500,
-    signal?.avgInputTokens ?? Math.ceil(task.objective.length / 4) + (task.contextTokens ?? 1500),
+    signal?.avgInputTokens ??
+      Math.ceil(task.objective.length / 4) + (task.contextTokens ?? DEFAULT_CONTEXT_TOKENS),
   );
   const output = Math.max(100, signal?.avgOutputTokens ?? Math.round(input / 10));
   return { input, output };
@@ -100,10 +162,16 @@ export function costFit(
 
 export interface ScoreBreakdown {
   score: number;
+  /** Weighted quality before the reliability multiplier, for re-scoring. */
+  qualityScore: number;
   costFit: number;
   kindMatch: number;
   reliability: number;
   estCostUsd: Known<number>;
+  /** Probability this attempt fails, from demand vs measured capability. */
+  pFail: number;
+  /** Token cost plus expected failure cost, when a failure cost is declared. */
+  expectedCostUsd: Known<number>;
 }
 
 export function scoreCandidate(
@@ -114,13 +182,23 @@ export function scoreCandidate(
   signal: RoutingSignal | undefined,
   cfg: QuotaConfig,
   weights: Weights = defaultWeights,
+  demand: number = DEMAND_BY_COMPLEXITY.moderate,
 ): ScoreBreakdown {
   const inPrice = effectiveInputPer1M(m, cap, cfg);
   const estCost = estimateCostUsd(m, task, cap, signal, cfg);
-  const fit = costFit(inPrice, estCost, task.maxCostUsd);
+  // History beats benchmarks, benchmarks beat nothing.
+  const quality = signal?.successRate ? signal.successRate : m.capabilityScore;
+  const pFail = failureProbability(quality, demand);
+  const fit =
+    task.failureCostUsd && task.failureCostUsd > 0
+      ? costFitExpected(
+          expectedCostUsd(estCost, pFail, task.failureCostUsd),
+          task.failureCostUsd,
+        )
+      : costFit(inPrice, estCost, task.maxCostUsd);
   const km = kindMatch(m, kind);
   const s = signal;
-  const quality =
+  const qualityScore =
     km * weights.kind +
     (s?.successRate ?? 0) * weights.success +
     fit * weights.cost +
@@ -130,11 +208,17 @@ export function scoreCandidate(
   // before succeeding is not cheaper than a reliable $0.06/M model.
   const reliability = m.reliability ?? 1;
   return {
-    score: quality * reliability,
+    score: qualityScore * reliability,
+    qualityScore,
     costFit: fit,
     kindMatch: km,
     reliability,
     estCostUsd: estCost,
+    pFail,
+    expectedCostUsd:
+      task.failureCostUsd && task.failureCostUsd > 0
+        ? expectedCostUsd(estCost, pFail, task.failureCostUsd)
+        : { known: false, reason: "no failure cost declared" },
   };
 }
 

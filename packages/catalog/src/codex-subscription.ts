@@ -18,6 +18,13 @@ export interface CodexModelSpec {
   maxContextTokens: number;
   strengths: ModelCapabilities["strengths"];
   weaknesses?: ModelCapabilities["weaknesses"];
+  /**
+   * Declared, not measured: OpenAI publishes no benchmark for these models.
+   * Without a score they are treated as mediocre and lose every risky task to
+   * a measured API model, which is the wrong default for capacity we already
+   * pay for. History corrects these numbers once runs accumulate.
+   */
+  declaredCapability?: number;
 }
 
 export const defaultCodexModels: CodexModelSpec[] = [
@@ -27,6 +34,7 @@ export const defaultCodexModels: CodexModelSpec[] = [
     tier: "mid",
     amortizedPer1M: 0.3,
     maxContextTokens: 200_000,
+    declaredCapability: 0.5,
     strengths: ["code-change", "refactor", "summarize", "extract"],
     weaknesses: ["plan"],
   },
@@ -36,6 +44,7 @@ export const defaultCodexModels: CodexModelSpec[] = [
     tier: "mid",
     amortizedPer1M: 0.35,
     maxContextTokens: 400_000,
+    declaredCapability: 0.6,
     strengths: ["code-change", "debug", "refactor", "review"],
   },
   {
@@ -44,6 +53,7 @@ export const defaultCodexModels: CodexModelSpec[] = [
     tier: "large",
     amortizedPer1M: 0.5,
     maxContextTokens: 400_000,
+    declaredCapability: 0.72,
     strengths: ["code-change", "debug", "plan", "review", "refactor"],
   },
   {
@@ -52,6 +62,7 @@ export const defaultCodexModels: CodexModelSpec[] = [
     tier: "large",
     amortizedPer1M: 0.8,
     maxContextTokens: 1_000_000,
+    declaredCapability: 0.8,
     strengths: ["plan", "debug", "review", "code-change"],
   },
 ];
@@ -113,6 +124,8 @@ export class CodexSubscriptionSource {
         provider: this.id,
         displayName: m.displayName,
         tier: m.tier,
+        capabilityScore: m.declaredCapability,
+        capabilityScoreSource: m.declaredCapability === undefined ? undefined : "declared",
         maxContextTokens: m.maxContextTokens,
         strengths: m.strengths,
         weaknesses: m.weaknesses,

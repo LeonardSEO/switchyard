@@ -32,10 +32,17 @@ const api = (id: string, tier: string, inUsd: number, outUsd: number): ModelCapa
   },
 });
 
-const subscription = (id: string, tier: string, amortized: number): ModelCapabilities => ({
+const subscription = (
+  id: string,
+  tier: string,
+  amortized: number,
+  capability = 0.5,
+): ModelCapabilities => ({
   id,
   provider: "codex-subscription",
   tier: tier as ModelCapabilities["tier"],
+  capabilityScore: capability,
+  capabilityScoreSource: "declared",
   maxContextTokens: 400_000,
   supportsTools: ["bash", "read", "write", "edit"],
   pricing: {
@@ -138,10 +145,12 @@ describe("scoring", () => {
     const hard = { objective: "design a distributed migration plan", kind: "plan" as const, risk: "high" as const };
     expect(route(hard, [cheap, mid, large], keywordClassification(hard)).admissionRequired).toBe(true);
     // Two identically priced candidates: only admission can separate them.
-    const thin = { objective: "rename a variable", kind: "code-change" as const };
+    const thin = { objective: "rename a variable", kind: "code-change" as const, failureCostUsd: 0 };
     const twin = api("cheap-twin", "small", 0.25, 1.25);
     expect(route(thin, [cheap, twin], keywordClassification(thin)).admissionRequired).toBe(true);
     // A 60x price gap leaves no doubt: no admission round trip needed.
+    // Priced without a failure cost on purpose: once failure has a price the
+    // ordering shifts and this assertion would be about two things at once.
     expect(route(thin, [cheap, large], keywordClassification(thin)).admissionRequired).toBe(false);
   });
 

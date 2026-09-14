@@ -88,6 +88,12 @@ export interface ModelCapabilities {
    * cold-start quality prior: it replaces guesswork before any history exists.
    */
   capabilityScore?: number;
+  /**
+   * Where the score came from. "declared" means somebody asserted it (our
+   * subscription roster, an operator override) rather than measured it, and it
+   * should be treated as a belief that history will correct.
+   */
+  capabilityScoreSource?: "benchmark" | "declared";
   /** Declared request-level capabilities (function calling, schema output, ...). */
   capabilities?: {
     toolCalling?: boolean;
@@ -152,5 +158,12 @@ export interface TaskSpec {
   skipModels?: string[];
   /** Allow asynchronous batch endpoints. Off by default: coding agents wait. */
   allowBatch?: boolean;
+  /**
+   * What one failed attempt costs you, in USD: your rework time, a missed
+   * deadline, a wrong merge. Per-task token costs are tiny (cents); the cost of
+   * getting it wrong is not. Without this the cheapest model always wins, which
+   * is only correct when failure is free.
+   */
+  failureCostUsd?: number;
   session?: SessionContext;
 }
