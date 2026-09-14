@@ -5,3 +5,4 @@ export * from "./scorer";
 export * from "./filter";
 export * from "./classifier";
 export * from "./route";
+export * from "./pareto";

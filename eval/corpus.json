@@ -33,7 +33,7 @@
       "pricing": { "kind": "api", "inputPer1M": { "known": true, "value": 15 }, "outputPer1M": { "known": true, "value": 75 } }
     },
     {
-      "id": "or-granite-micro",
+      "id": "synthetic-micro",
       "provider": "openrouter",
       "tier": "small",
       "maxContextTokens": 131072,
@@ -43,7 +43,7 @@
       "pricing": { "kind": "api", "inputPer1M": { "known": true, "value": 0.017 }, "outputPer1M": { "known": true, "value": 0.112 } }
     },
     {
-      "id": "or-deepseek-v4-flash",
+      "id": "synthetic-cheap-mid",
       "provider": "openrouter",
       "tier": "mid",
       "maxContextTokens": 1000000,
@@ -103,7 +103,7 @@
       "source": "veto",
       "task": { "kind": "summarize", "risk": "low", "objective": "Summarize the release notes in five bullets." },
       "outcomes": { "cheap-small": { "success": true }, "balanced-mid": { "success": true }, "strong-large": { "success": true } },
-      "expect": { "complexity": "simple", "modelIdIn": ["or-granite-micro", "cheap-small", "balanced-mid", "strong-large"] }
+      "expect": { "complexity": "simple", "modelIdIn": ["synthetic-micro", "cheap-small", "balanced-mid", "strong-large"] }
     },
     {
       "id": "debug-timeout",
@@ -147,7 +147,7 @@
       "note": "trivial rename should land on the cheapest model declared capable of code-change. Not asserted in warm mode: history says every cheap code-change model in this corpus failed, and warm mode trusts history.",
       "assertWarm": false,
       "task": { "kind": "code-change", "risk": "low", "objective": "Rename the variable total to orderTotal in the checkout module." },
-      "expect": { "complexity": "simple", "modelIdIn": ["or-deepseek-v4-flash", "or-granite-micro", "cheap-small"] }
+      "expect": { "complexity": "simple", "modelIdIn": ["synthetic-cheap-mid", "synthetic-micro", "cheap-small"] }
     },
     {
       "id": "feature-plenty-of-quota",
@@ -171,7 +171,7 @@
         "codex-luna": { "available": true, "usage": { "remainingFraction": 0.05, "windowElapsedFraction": 0.9, "source": "test" } },
         "codex-terra": { "available": true, "usage": { "remainingFraction": 0.05, "windowElapsedFraction": 0.9, "source": "test" } }
       },
-      "expect": { "complexity": "moderate", "modelIdIn": ["or-deepseek-v4-flash", "balanced-mid"] }
+      "expect": { "complexity": "moderate", "modelIdIn": ["synthetic-cheap-mid", "balanced-mid"] }
     },
     {
       "id": "hard-deadlock-debug",

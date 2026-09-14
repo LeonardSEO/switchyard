@@ -11,6 +11,8 @@
   "scripts": {
     "test": "vitest run",
     "bench": "tsx eval/benchmark.ts",
+    "bench:live": "tsx scripts/bench-live.ts",
+    "catalog": "tsx scripts/catalog.ts",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
