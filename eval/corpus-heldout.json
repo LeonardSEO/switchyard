@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "note": "Held-out set: written after the keyword lexicon and thresholds were fixed, never used to tune them. Use this to judge accuracy; eval/corpus.json is now a fitting set.",
+  "scenarios": [
+    { "id": "typo-readme", "task": { "objective": "Fix the typo in the README heading" }, "expect": { "complexity": "trivial" } },
+    { "id": "bump-version", "task": { "objective": "Bump the version in package.json to 2.1.0" }, "expect": { "complexity": "trivial" } },
+    { "id": "null-check", "task": { "objective": "Add a null check to parseConfig" }, "expect": { "complexity": "simple" } },
+    { "id": "log-level", "task": { "objective": "Change the log level from info to debug in worker.ts" }, "expect": { "complexity": "simple" } },
+    { "id": "pagination-tests", "task": { "objective": "Add pagination to the listUsers endpoint, including tests" }, "expect": { "complexity": "moderate" } },
+    { "id": "failing-formatter-test", "task": { "objective": "Fix the failing test for the currency formatter" }, "expect": { "complexity": "moderate" } },
+    { "id": "repository-layer", "task": { "objective": "Introduce a repository layer so handlers stop touching the database directly" }, "expect": { "complexity": "advanced" } },
+    { "id": "tracing-layers", "task": { "objective": "Add OpenTelemetry tracing across the HTTP and worker layers" }, "expect": { "complexity": "advanced" } },
+    { "id": "sharded-migration", "task": { "objective": "Migrate the orders table to sharded Postgres without downtime" }, "expect": { "complexity": "complex" } },
+    { "id": "cache-race", "task": { "objective": "Fix the race condition between cache invalidation and writes" }, "expect": { "complexity": "complex" } },
+    { "id": "multi-tenant-platform", "task": { "objective": "Design a multi-tenant event sourced architecture for the new platform" }, "expect": { "complexity": "frontier" } },
+    { "id": "rewrite-core-domain", "task": { "objective": "Rewrite the monolith's core domain as event-driven services" }, "expect": { "complexity": "frontier" } }
+  ]
+}

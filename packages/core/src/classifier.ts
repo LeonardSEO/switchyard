@@ -115,6 +115,12 @@ export interface ClassifierFloors {
    * content, which is useless for a one-line JSON answer. Off by default.
    */
   allowReasoning?: boolean;
+  /** Upper bound on acceptable classifier latency; models measured slower are skipped. */
+  maxLatencyMs?: number;
+  /** Measured latency per model, from previous calls. */
+  latencyMs?: (model: ModelCapabilities) => number | undefined;
+  /** Prefer a local model (Ollama, LM Studio): no network, nothing leaves the machine. */
+  preferLocal?: boolean;
 }
 
 export const defaultClassifierFloors: ClassifierFloors = {
@@ -125,6 +131,8 @@ export const defaultClassifierFloors: ClassifierFloors = {
   allowReasoning: false,
   requireBenchmark: true,
   minCapabilityScore: 0.2,
+  maxLatencyMs: 800,
+  preferLocal: true,
 };
 
 /**
@@ -137,10 +145,22 @@ export function pickCheapestClassifier(
   models: ModelCapabilities[],
   floors: ClassifierFloors = defaultClassifierFloors,
 ): ModelCapabilities | undefined {
+  // A local model wins outright: no network round trip and nothing leaves the
+  // machine. Classification is the one place where capability barely matters.
+  if (floors.preferLocal !== false) {
+    const local = models
+      .filter((m) => m.pricing.kind === "local")
+      .filter((m) => (m.maxContextTokens ?? 0) >= floors.minContextTokens)
+      .sort((a, b) => a.id.localeCompare(b.id));
+    if (local.length > 0) return local[0];
+  }
+
   const tierRank = { small: 0, mid: 1, large: 2, unknown: -1 } as const;
   const minTier = floors.minTier ? tierRank[floors.minTier] : -1;
-  let best: ModelCapabilities | undefined;
-  let bestPrice = Infinity;
+  // Two passes: prefer models measured within the latency budget, but never end
+  // up with nothing. Falling back to keywords because every model was slow would
+  // cost far more accuracy than the latency saves.
+  const eligible: ModelCapabilities[] = [];
   for (const m of models) {
     if (m.pricing.kind !== "api") continue;
     if (!m.pricing.inputPer1M.known) continue;
@@ -158,13 +178,24 @@ export function pickCheapestClassifier(
       if (m.capabilityScore < (floors.minCapabilityScore ?? 0)) continue;
     }
     if (tierRank[m.tier] < minTier) continue;
-    const price = m.pricing.inputPer1M.known ? m.pricing.inputPer1M.value : Infinity;
-    if (price < bestPrice) {
-      best = m;
-      bestPrice = price;
-    }
+    const measured = floors.latencyMs?.(m);
+    eligible.push(m);
   }
-  return best;
+  if (eligible.length === 0) return undefined;
+
+  const maxLatency = floors.maxLatencyMs ?? Number.POSITIVE_INFINITY;
+  const withinBudget = eligible.filter((m) => {
+    const measured = floors.latencyMs?.(m);
+    return measured === undefined || measured <= maxLatency;
+  });
+
+  const pool = withinBudget.length > 0 ? withinBudget : eligible;
+  const key = (m: ModelCapabilities) =>
+    withinBudget.length > 0
+      ? (m.pricing.inputPer1M.known ? m.pricing.inputPer1M.value : Infinity)
+      : (floors.latencyMs?.(m) ?? Number.POSITIVE_INFINITY);
+
+  return pool.reduce((best, m) => (key(m) < key(best) ? m : best));
 }
 
 export interface ModelClassifierOptions {

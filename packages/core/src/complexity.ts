@@ -12,6 +12,9 @@ const HIGH = [
   "microservices",
   "distributed system",
   "multi-tenant",
+  "deadlock",
+  "race condition",
+  "concurrency",
 ];
 const MEDIUM = [
   "architecture",
@@ -21,9 +24,22 @@ const MEDIUM = [
   "system design",
   "from scratch",
   "production-grade",
+  "distributed",
+  "migration",
 ];
-const LOW = ["e2e", "pipeline", "service", "deploy", "integrate", "infra"];
-const SIMPLE = ["simple", "basic", "quick", "hello world"];
+const LOW = ["e2e", "pipeline", "service", "deploy", "integrate", "infra", "implement"];
+/** Words that mark a task as mechanical: no design decision, one place. */
+const SIMPLE = [
+  "simple",
+  "basic",
+  "quick",
+  "hello world",
+  "rename",
+  "typo",
+  "reformat",
+  "bump",
+  "comment",
+];
 
 export interface ComplexityEstimate {
   complexity: Complexity;

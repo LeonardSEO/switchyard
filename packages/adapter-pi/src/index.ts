@@ -5,8 +5,10 @@ import {
   defaultClassifierFloors,
   pickCheapestClassifier,
   route,
+  ClassificationCache,
   type Classification,
   type Classifier,
+  type CompletionFn,
   type ModelCapabilities,
   type RoutingSignal,
 } from "@switchyard/core";
@@ -16,14 +18,21 @@ import type { PiApiLike, PiContextLike, PiModelLike } from "./pi";
 import { matchPiModel } from "./pi";
 import { createPiCompletion } from "./completion";
 import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes";
+import { loadCache, loadLatencies, recordLatency, saveCache } from "./store";
 
 export * from "./pi";
 export * from "./outcomes";
+export * from "./store";
+export * from "./completion";
 
 export interface AdapterOptions {
   /** Injectable for tests; defaults to the live snapshot builder. */
   loadSnapshot?: () => Promise<Snapshot>;
   outcomeFile?: string;
+  /** Classification cache file; defaults to ~/.switchyard/classifier-cache.json */
+  cacheFile?: string;
+  /** Classifier latency file; defaults to ~/.switchyard/classifier-latency.json */
+  latencyFile?: string;
   /** Tell the user what was chosen. Off in tests. */
   quiet?: boolean;
   /**
@@ -65,25 +74,41 @@ export function createExtension(opts: AdapterOptions = {}) {
     const getClassifier = (ctx: PiContextLike, snap: Snapshot): Promise<Classifier> => {
       if (!classifierPromise) {
         classifierPromise = (async () => {
-          const apiModels = snap.models.filter((m) => m.pricing.kind === "api");
+          const candidates = snap.models.filter(
+            (m) => m.pricing.kind === "api" || m.pricing.kind === "local",
+          );
+          const latencies = await loadLatencies(opts.latencyFile);
           // Below ~0.5 the models guess rather than follow the schema, and the
           // rung they pick is what every other decision hangs on.
-          const picked = pickCheapestClassifier(apiModels, {
+          const picked = pickCheapestClassifier(candidates, {
             ...defaultClassifierFloors,
             minCapabilityScore: 0.5,
             // Nearly everything capable is a reasoning model now; the call
             // itself switches reasoning off rather than excluding them.
             allowReasoning: true,
+            latencyMs: (m) => latencies[m.id],
           });
           if (!picked) return new KeywordClassifier();
+
+          const cache = new Map(Object.entries(await loadCache(opts.cacheFile)));
+          const diskCache = {
+            get: (task: { kind?: string; objective: string }) =>
+              cache.get(ClassificationCache.key(task as never)),
+            set: (task: { kind?: string; objective: string }, value: Classification) => {
+              cache.set(ClassificationCache.key(task as never), value);
+              void saveCache(Object.fromEntries(cache), opts.cacheFile);
+            },
+          };
+
           return new ModelClassifier({
-            models: apiModels,
-            complete: createPiCompletion(ctx),
+            models: candidates,
+            cache: diskCache as never,
+            complete: timedCompletion(ctx, picked.id, opts.latencyFile),
             modelId: picked.id,
-            // Measured: keyword 5/10 vs model 8/10 on the corpus, at $0.00014
-            // for nine calls. The rung decides every other decision, so it is
-            // worth one cheap round trip. Cached, budgeted, and it degrades to
-            // the keyword answer if the call fails.
+            // Measured on a held-out set: keyword 2/12, model 11/12. The rung
+            // decides every other decision, so it is worth one round trip —
+            // cached on disk, latency-tracked, and degrading to the keyword
+            // answer if the call fails.
             escalation: opts.escalation ?? "always",
             minSavingsFactor: 0,
           });
@@ -217,6 +242,22 @@ function routeSafely(
   } catch {
     return undefined;
   }
+}
+
+/** Wraps the completion to record latency, so slow classifiers get replaced. */
+function timedCompletion(
+  ctx: PiContextLike,
+  modelId: string,
+  latencyFile?: string,
+): CompletionFn {
+  const inner = createPiCompletion(ctx);
+  const started = () => Date.now();
+  return async (req) => {
+    const t = started();
+    const res = await inner(req);
+    void recordLatency(modelId, Date.now() - t, latencyFile);
+    return res;
+  };
 }
 
 export default createExtension();

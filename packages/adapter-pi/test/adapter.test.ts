@@ -132,6 +132,8 @@ describe("pi adapter", () => {
     createExtension({
       loadSnapshot: async () => snapshotOf([cheap, flash, sol]),
       outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
       quiet: true,
     })(pi);
 
@@ -150,6 +152,8 @@ describe("pi adapter", () => {
         },
       }),
       outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
       quiet: true,
     })(pi);
 
@@ -166,6 +170,8 @@ describe("pi adapter", () => {
     createExtension({
       loadSnapshot: async () => snapshotOf([cheap, flash]),
       outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
       quiet: true,
     })(pi);
     await handlers.before_agent_start!({ prompt: "rename a variable" }, ctx);
@@ -179,6 +185,8 @@ describe("pi adapter", () => {
         throw new Error("offline");
       },
       outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
       quiet: true,
     })(pi);
     await handlers.before_agent_start!({ prompt: "rename a variable" }, ctx);
@@ -191,6 +199,8 @@ describe("pi adapter", () => {
     createExtension({
       loadSnapshot: async () => snapshotOf([cheap, flash, sol]),
       outcomeFile: file,
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
       quiet: true,
     })(pi);
 
@@ -263,6 +273,8 @@ describe("classifier escalation", () => {
       createExtension({
         loadSnapshot: async () => snapshot,
         outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
         quiet: true,
       })(pi);
       await handlers.before_agent_start!({ prompt: uncertain }, ctx);
@@ -288,6 +300,8 @@ describe("classifier escalation", () => {
       createExtension({
         loadSnapshot: async () => snapshotOf([classifierModel("cheap/classifier", 0.01, 0.55)]),
         outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
         quiet: true,
         escalation: "uncertain",
       })(pi);
@@ -316,6 +330,8 @@ describe("classifier escalation", () => {
             classifierModel("frontier/large", 3, 0.8, "large"),
           ]),
         outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
         quiet: false,
       })(pi);
       await handlers.before_agent_start!({ prompt: uncertain }, ctx);
@@ -352,6 +368,8 @@ describe("classifier call shape", () => {
         loadSnapshot: async () =>
           snapshotOf([thinking, classifierModel("frontier/large", 3, 0.8, "large")]),
         outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
         quiet: true,
       })(pi);
       await handlers.before_agent_start!({ prompt: "implement service" }, ctx);
@@ -393,6 +411,8 @@ describe("escalation policy", () => {
             classifierModel("frontier/large", 3, 0.8, "large"),
           ]),
         outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
         quiet: true,
       })(pi);
       // Confident keyword answer (trivial), yet escalation is on by default.

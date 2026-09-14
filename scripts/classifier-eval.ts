@@ -27,8 +27,10 @@ interface Scenario {
 }
 
 const here = dirname(fileURLToPath(import.meta.url));
+const heldout = process.argv.includes("--heldout");
+const corpusFile = heldout ? "corpus-heldout.json" : "corpus.json";
 const corpus = JSON.parse(
-  readFileSync(join(here, "..", "eval", "corpus.json"), "utf8"),
+  readFileSync(join(here, "..", "eval", corpusFile), "utf8"),
 ) as { scenarios: Scenario[] };
 const cachePath = join(here, "..", "eval", "classifier-cache.json");
 const cache: Record<string, string> = existsSync(cachePath)
@@ -60,6 +62,7 @@ const classifierModel = pickCheapestClassifier(apiModels, {
   allowReasoning: true,
 });
 
+console.log(`corpus: ${corpusFile}${heldout ? " (held out)" : " (fitting set)"}`);
 console.log(`classifier model: ${classifierModel?.id ?? "none"}  mode: ${forceAll ? "always (gate off)" : "gated"}`);
 if (!classifierModel) {
   console.error("no classifier model available; cannot evaluate");

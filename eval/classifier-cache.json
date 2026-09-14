@@ -7,5 +7,17 @@
   "inclusionai/ling-3.0-flash|Design a migration plan for the distributed event pipeline.": "{\"kind\":\"plan\",\"complexity\":\"complex\",\"confidence\":0.85,\"why\":\"Distributed migration with cutover, consistency, and rollback\"}",
   "inclusionai/ling-3.0-flash|Rename the variable total to orderTotal in the checkout module.": "{\"kind\":\"code-change\",\"complexity\":\"trivial\",\"confidence\":0.95,\"why\":\"Single variable rename in one module\"}",
   "inclusionai/ling-3.0-flash|Implement pagination for the orders API endpoint.": "{\"kind\":\"code-change\",\"complexity\":\"moderate\",\"confidence\":0.85,\"why\":\"Multi-file feature spanning endpoint handler, data access, and response schema with design choices on pagination strategy\"}",
-  "inclusionai/ling-3.0-flash|Debug the intermittent deadlock in the distributed event pipeline.": "{\"kind\":\"debug\",\"complexity\":\"complex\",\"confidence\":0.95,\"why\":\"Distributed deadlock debugging\"}"
+  "inclusionai/ling-3.0-flash|Debug the intermittent deadlock in the distributed event pipeline.": "{\"kind\":\"debug\",\"complexity\":\"complex\",\"confidence\":0.95,\"why\":\"Distributed deadlock debugging\"}",
+  "inclusionai/ling-3.0-flash|Fix the typo in the README heading": "{\"kind\":\"trivial\",\"complexity\":\"trivial\",\"confidence\":0.95,\"why\":\"Single typo fix in one file heading\"}",
+  "inclusionai/ling-3.0-flash|Bump the version in package.json to 2.1.0": "{\"kind\":\"code-change\",\"complexity\":\"trivial\",\"confidence\":1.0,\"why\":\"Single version string edit in package.json\"}",
+  "inclusionai/ling-3.0-flash|Add a null check to parseConfig": "{\"kind\":\"code-change\",\"complexity\":\"simple\",\"confidence\":0.9,\"why\":\"Single function null check, obvious fix\"}",
+  "inclusionai/ling-3.0-flash|Change the log level from info to debug in worker.ts": "{\"kind\":\"code-change\",\"complexity\":\"trivial\",\"confidence\":0.95,\"why\":\"Single-line log level change in one file\"}",
+  "inclusionai/ling-3.0-flash|Add pagination to the listUsers endpoint, including tests": "{\"kind\":\"code-change\",\"complexity\":\"moderate\",\"confidence\":0.85,\"why\":\"Multi-file feature with design choices for pagination\"}",
+  "inclusionai/ling-3.0-flash|Fix the failing test for the currency formatter": "",
+  "inclusionai/ling-3.0-flash|Introduce a repository layer so handlers stop touching the database directly": "{\"kind\":\"refactor\",\"complexity\":\"advanced\",\"confidence\":0.9,\"why\":\"Introduce repository pattern across handlers\"}",
+  "inclusionai/ling-3.0-flash|Add OpenTelemetry tracing across the HTTP and worker layers": "{\"kind\":\"code-change\",\"complexity\":\"advanced\",\"confidence\":0.85,\"why\":\"Cross-cutting instrumentation requiring design choices across HTTP and worker layers\"}",
+  "inclusionai/ling-3.0-flash|Migrate the orders table to sharded Postgres without downtime": "{\"kind\":\"plan\",\"complexity\":\"complex\",\"confidence\":0.85,\"why\":\"Distributed data migration with zero-downtime requirement\"}",
+  "inclusionai/ling-3.0-flash|Fix the race condition between cache invalidation and writes": "{\"kind\":\"debug\",\"complexity\":\"complex\",\"confidence\":0.9,\"why\":\"Concurrency bug requiring synchronization design\"}",
+  "inclusionai/ling-3.0-flash|Design a multi-tenant event sourced architecture for the new platform": "{\"kind\":\"plan\",\"complexity\":\"frontier\",\"confidence\":0.9,\"why\":\"Greenfield architecture with multi-tenancy and event sourcing\"}",
+  "inclusionai/ling-3.0-flash|Rewrite the monolith's core domain as event-driven services": "{\"kind\":\"code-change\",\"complexity\":\"frontier\",\"confidence\":0.9,\"why\":\"Greenfield rewrite of core domain architecture\"}"
 }

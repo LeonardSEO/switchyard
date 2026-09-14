@@ -75,7 +75,8 @@ describe("complexity", () => {
   });
 
   it("flags answers near a threshold as uncertain", () => {
-    const c = keywordClassification({ objective: "implement service" });
+    // "deploy" scores exactly 1, which sits on the threshold.
+    const c = keywordClassification({ objective: "deploy" });
     expect(isUncertain(c)).toBe(true);
     expect(isUncertain({ ...c, score: 6 })).toBe(false);
   });
@@ -279,8 +280,8 @@ describe("classifier", () => {
       throw new Error("offline");
     });
     const c = new ModelClassifier({ models: [...models, mid, large], complete });
-    const out = await c.classify({ objective: "implement service" });
-    expect(keywordClassification({ objective: "implement service" }).score).toBe(uncertain.score);
+    const out = await c.classify({ objective: "deploy" });
+    expect(keywordClassification({ objective: "deploy" }).score).toBe(uncertain.score);
     expect(out.degraded).toBe(true);
     expect(out.complexity).toBe("moderate");
   });
@@ -301,7 +302,8 @@ describe("classifier", () => {
   it("uses the model answer and caches it", async () => {
     const complete = vi.fn(async () => ({ text: '{"complexity":"complex","confidence":0.93}' }));
     const c = new ModelClassifier({ models: [...models, mid, large], complete });
-    const task = { objective: "implement service" };
+    // Score 1: uncertain, so the model is actually asked.
+    const task = { objective: "deploy" };
     const first = await c.classify(task);
     const second = await c.classify(task);
     expect(first.complexity).toBe("complex");
