@@ -1,0 +1,48 @@
+name: Release
+
+# Publishes every package whose version in package.json is not yet on npm.
+# One tag per release: `git tag v0.1.7 && git push --tags`.
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Install
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npx vitest run
+
+      - name: Build
+        run: npm run build
+
+      - name: Publish packages whose version is new
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          for pkg in core catalog provider-openrouter adapter-pi gateway opencode; do
+            name=$(node -p "require('./packages/$pkg/package.json').name")
+            version=$(node -p "require('./packages/$pkg/package.json').version")
+            if npm view "$name@$version" version > /dev/null 2>&1; then
+              echo "skip $name@$version (already published)"
+            else
+              echo "publishing $name@$version"
+              npm publish --workspace "packages/$pkg" --access public
+            fi
+          done
