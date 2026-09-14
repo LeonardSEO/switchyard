@@ -25,8 +25,8 @@ export const CHEAP_FLOOR_PER_1M = 0.01;
  */
 export const DEMAND_BY_COMPLEXITY: Record<string, number> = {
   trivial: 0.15,
-  simple: 0.3,
-  moderate: 0.5,
+  simple: 0.6,
+  moderate: 0.66,
   advanced: 0.69,
   complex: 0.72,
   frontier: 0.85,
@@ -39,8 +39,8 @@ export const DEMAND_BY_COMPLEXITY: Record<string, number> = {
  */
 export const MIN_CAPABILITY_BY_COMPLEXITY: Record<string, number> = {
   trivial: 0,
-  simple: 0.15,
-  moderate: 0.35,
+  simple: 0.4,
+  moderate: 0.55,
   advanced: 0.6,
   complex: 0.68,
   frontier: 0.7,

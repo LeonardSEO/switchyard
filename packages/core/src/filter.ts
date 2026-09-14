@@ -29,6 +29,12 @@ export interface FilterContext {
    * on a routine task costs you the option of using it when it matters.
    */
   minQuotaFraction?: number;
+  /**
+   * Ignore models cheaper than this, USD per 1M input tokens. A rung can use it
+   * to say "this class of work does not go to the cheapest thing that measures
+   * well" when you distrust the benchmark at the cheap end.
+   */
+  minPricePer1M?: number;
 }
 
 /**
@@ -71,6 +77,11 @@ function rejectionReason(
   }
   // Batch endpoints answer hours later, not in the middle of a coding session.
   if (m.batchOnly && !task.allowBatch) return "async batch endpoint";
+
+  const priceFloor = ctx.minPricePer1M ?? 0;
+  if (priceFloor > 0 && m.pricing.inputPer1M.known && m.pricing.inputPer1M.value < priceFloor) {
+    return `below price floor $${priceFloor}/M`;
+  }
 
   const usage = ctx.capacity?.[m.id];
   if (

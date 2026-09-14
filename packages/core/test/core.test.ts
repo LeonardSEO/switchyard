@@ -145,8 +145,13 @@ describe("scoring", () => {
   });
 
   it("requires admission for complex or high-risk tasks and for thin margins", () => {
-    const hard = { objective: "design a distributed migration plan", kind: "plan" as const, risk: "high" as const };
-    expect(route(hard, [cheap, mid, large], keywordClassification(hard)).admissionRequired).toBe(true);
+    const hard = {
+      objective: "design a distributed microservices architecture migration plan",
+      kind: "plan" as const,
+      risk: "high" as const,
+    };
+    const strong = { ...large, capabilityScore: 0.8 };
+    expect(route(hard, [cheap, mid, strong], keywordClassification(hard)).admissionRequired).toBe(true);
     // Two identically priced candidates: only admission can separate them.
     const thin = { objective: "rename a variable", kind: "code-change" as const, failureCostUsd: 0 };
     const twin = api("cheap-twin", "small", 0.25, 1.25);
@@ -161,11 +166,15 @@ describe("scoring", () => {
     const task = { objective: "refactor the duplicated authentication service", kind: "refactor" as const };
     const cls = keywordClassification(task);
     const small = { ...cheap, capabilityScore: 0.2 };
-    const withCapacity = route(task, [small, mid, luna], cls, {
+    const lunaStrong = subscription("codex-luna", "mid", 0.3, 0.6);
+    // Rung floors moved up with the ladder: give the fixtures capability that
+    // actually clears the moderate floor.
+    const midCapable = { ...mid, capabilityScore: 0.62 };
+    const withCapacity = route(task, [small, midCapable, lunaStrong], cls, {
       capacity: { "codex-luna": { available: false, reason: "rate limited" } },
     });
     expect(withCapacity.model?.id).toBe("balanced-mid");
-    const plenty = route(task, [small, mid, luna], cls, {
+    const plenty = route(task, [small, midCapable, lunaStrong], cls, {
       capacity: {
         "codex-luna": { available: true, usage: { remainingFraction: 0.95, windowElapsedFraction: 0.05, source: "t" } },
       },
@@ -184,6 +193,7 @@ describe("scoring", () => {
   it("prefers paid-for capacity on complex work but not on trivial work", () => {
     const cash = { ...api("cash-large", "large", 0.15, 0.75), capabilityScore: 0.72 };
     const sub = subscription("codex-sol", "large", 0.5, 0.774);
+  const lunaStrong = subscription("codex-luna", "mid", 0.3, 0.6);
     const complex = {
       objective: "rewrite the billing service from scratch as a scalable event-driven system",
       complexity: "complex" as const,
