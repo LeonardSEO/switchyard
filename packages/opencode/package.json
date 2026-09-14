@@ -1,6 +1,6 @@
 {
   "name": "@vepando/switchyard-opencode",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "Apache-2.0",
   "type": "module",
   "author": "LeonardSEO",
@@ -24,6 +24,7 @@
   },
   "keywords": [
     "pi-package",
+    "pi",
     "opencode",
     "opencode-plugin",
     "model-router",
