@@ -42,6 +42,8 @@ export interface RouteDecision {
   effort: ReasoningEffort;
   /** True when the routing margin is thin: ask the candidate to self-admit. */
   admissionRequired: boolean;
+  /** True when already-paid subscription capacity was preferred over cash. */
+  paidCapacityPreferred: boolean;
   reason: string;
 }
 
@@ -49,6 +51,11 @@ export interface RouteOptions extends FilterContext {
   weights?: Partial<Weights>;
   /** Score gap below which admission is required. */
   admissionMargin?: number;
+  /**
+   * Prefer already-paid subscription capacity while it is within this factor of
+   * the best cash candidate. 0 disables the preference.
+   */
+  preferPaidCapacityFactor?: number;
   /**
    * Cost of one failed attempt, by task risk. Only used when the task does not
    * declare `failureCostUsd` itself. Set any entry to 0 to go back to
@@ -62,6 +69,13 @@ export interface RouteOptions extends FilterContext {
  * Without this the cheapest model always wins, which is only right when failure
  * is free — and for a rewrite it is not.
  */
+/**
+ * How much worse in expected cost already-paid capacity may be and still win.
+ * 2 means: subscription capacity is preferred while it is within 2x of the best
+ * cash option; beyond that, pay.
+ */
+export const DEFAULT_PREFER_PAID_CAPACITY_FACTOR = 2;
+
 export const DEFAULT_FAILURE_COST_BY_RISK: Record<string, number> = {
   low: 1,
   medium: 5,
@@ -177,6 +191,34 @@ export function route(
     ranked.sort((a, b) => b.score - a.score);
   }
 
+// Prefer capacity you already paid for — but only where that is justified.
+// On a trivial task every capable model is equally likely to succeed, so
+// expected costs are nearly identical and any preference would decide
+// everything: there, being frugal with quota is the whole point. On complex and
+// frontier work the subscription is the right call while it lasts.
+const earnedCapacityIsWorthSpending = complexity === "complex" || complexity === "frontier";
+const topBeforePreference = ranked[0]?.model ?? null;
+if (
+  earnedCapacityIsWorthSpending &&
+  topBeforePreference &&
+  topBeforePreference.pricing.kind !== "subscription" &&
+  (opts.preferPaidCapacityFactor ?? DEFAULT_PREFER_PAID_CAPACITY_FACTOR) > 0 &&
+  expectedCosts.length > 0
+) {
+  const factor = opts.preferPaidCapacityFactor ?? DEFAULT_PREFER_PAID_CAPACITY_FACTOR;
+  const best = Math.min(...expectedCosts);
+  const index = ranked.findIndex(
+    (r) =>
+      r.model.pricing.kind === "subscription" &&
+      r.expectedCostUsd.known &&
+      r.expectedCostUsd.value <= best * factor,
+  );
+  if (index > 0) {
+    const [preferred] = ranked.splice(index, 1);
+    ranked.unshift(preferred);
+  }
+}
+
   const top = ranked[0]?.model ?? null;
   const margin =
     ranked.length > 1 ? ranked[0].score - ranked[1].score : Number.POSITIVE_INFINITY;
@@ -195,6 +237,11 @@ export function route(
     pruned,
     effort: effortForComplexity(complexity, task.risk),
     admissionRequired,
+    paidCapacityPreferred:
+      topBeforePreference !== null &&
+      top !== null &&
+      top.id !== topBeforePreference.id &&
+      top.pricing.kind === "subscription",
     reason: explain(task, complexity, top, ranked, pruned, admissionRequired, margin),
   };
 }

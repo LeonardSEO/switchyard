@@ -45,6 +45,14 @@ export const OVERQUALIFICATION_BAND = 0.05;
 /** Assumed capability when nothing is published: mediocre, not average. */
 export const UNMEASURED_CAPABILITY = 0.4;
 
+/**
+ * Risk premium on models with no published benchmark. Buy unknown quality only
+ * when it is clearly cheaper: without this, a $0.002/M price gap — fifty
+ * microdollars on a real task — decides between a measured model and one nobody
+ * has scored.
+ */
+export const UNMEASURED_RISK_PREMIUM = 1.25;
+
 export function effectiveCapability(capability: number, demand: number): number {
   return Math.min(capability, demand + OVERQUALIFICATION_BAND);
 }
@@ -191,6 +199,11 @@ export function costFit(
   return Math.log(scale.reference / p) / Math.log(scale.reference / scale.floor);
 }
 
+/** Multiply a known value, leave unknown untouched. */
+function scale(value: Known<number>, factor: number): Known<number> {
+  return value.known ? known(value.value * factor) : value;
+}
+
 export interface ScoreBreakdown {
   score: number;
   /** Weighted quality before the reliability multiplier, for re-scoring. */
@@ -217,32 +230,38 @@ export function scoreCandidate(
   /** Hard ceiling on credited capability, used for the frontier band. */
   qualityCap?: number,
 ): ScoreBreakdown {
-  const inPrice = effectiveInputPer1M(m, cap, cfg);
-  const estCost = estimateCostUsd(m, task, cap, signal, cfg);
+  const premium = m.capabilityScore === undefined ? UNMEASURED_RISK_PREMIUM : 1;
+  const inPrice = scale(effectiveInputPer1M(m, cap, cfg), premium);
+  const estCost = scale(estimateCostUsd(m, task, cap, signal, cfg), premium);
   // History beats benchmarks, benchmarks beat nothing. Capability above what
   // the task demands is capped: it is noise, not value.
   const raw = signal?.successRate ? signal.successRate : m.capabilityScore;
   const ceiling = Math.min(demand + OVERQUALIFICATION_BAND, qualityCap ?? Number.POSITIVE_INFINITY);
-  // Unmeasured gets the same ceiling, otherwise being measured would count
-  // against a model on tasks that need almost nothing.
-  const quality =
-    raw === undefined ? undefined : Math.min(raw ?? UNMEASURED_CAPABILITY, ceiling);
+  // Unmeasured gets the assumed level and the same ceiling. Returning
+  // "undefined" here would silently skip the ceiling and hand unmeasured models
+  // a better score than measured ones on tasks that need almost nothing.
+  const quality = Math.min(raw ?? UNMEASURED_CAPABILITY, ceiling);
   const pFail = failureProbability(quality, demand);
+  const expected = expectedCostUsd(estCost, pFail, task.failureCostUsd ?? 0);
   const fit =
     task.failureCostUsd && task.failureCostUsd > 0
-      ? costFitExpected(
-          expectedCostUsd(estCost, pFail, task.failureCostUsd),
-          task.failureCostUsd,
-        )
+      ? costFitExpected(scale(expected, premium), task.failureCostUsd)
       : costFit(inPrice, estCost, task.maxCostUsd);
   const km = kindMatch(m, kind);
   const s = signal;
+  // The eval term uses the same ceiling. Otherwise capping failure probability
+  // but not quality silently hands the decision back to raw capability, and the
+  // most capable model wins again through the back door.
+  const evalScore = Math.min(
+    s?.evalScore ?? m.capabilityScore ?? UNMEASURED_CAPABILITY,
+    ceiling,
+  );
   const qualityScore =
     km * weights.kind +
     (s?.successRate ?? 0) * weights.success +
     fit * weights.cost +
     (1 - (s?.rejectRate ?? 0)) * weights.reject +
-    (s?.evalScore ?? 0) * weights.eval;
+    evalScore * weights.eval;
   // Expected retries are a cost too: a rate-limited free tier that fails twice
   // before succeeding is not cheaper than a reliable $0.06/M model.
   const reliability = m.reliability ?? 1;

@@ -171,6 +171,28 @@ describe("scoring", () => {
     expect(plenty.model?.id).toBe("codex-luna");
   });
 
+  it("prefers a measured model over an unmeasured one at the same price", () => {
+    const measured = { ...api("measured-mid", "mid", 0.02, 0.1), capabilityScore: 0.6 };
+    const mystery = api("mystery-mid", "mid", 0.02, 0.1);
+    const task = { objective: "rename a variable", kind: "code-change" as const };
+    const d = route(task, [measured, mystery], keywordClassification(task));
+    expect(d.model?.id).toBe("measured-mid");
+  });
+
+  it("prefers paid-for capacity on complex work but not on trivial work", () => {
+    const cash = { ...api("cash-large", "large", 0.15, 0.75), capabilityScore: 0.72 };
+    const sub = subscription("codex-sol", "large", 0.5, 0.774);
+    const complex = {
+      objective: "rewrite the billing service from scratch as a scalable event-driven system",
+      complexity: "complex" as const,
+      risk: "high" as const,
+    };
+    const trivial = { objective: "rename a variable", complexity: "trivial" as const };
+    expect(route(complex, [cash, sub], keywordClassification(complex)).model?.id).toBe("codex-sol");
+    // Quota is precious when the task does not need it: frugal wins.
+    expect(route(trivial, [cash, sub], keywordClassification(trivial)).model?.id).toBe("cash-large");
+  });
+
   it("fails closed when nothing survives", () => {
     const task = { objective: "design a distributed system", kind: "plan" as const };
     const d = route(task, [cheap], keywordClassification(task));
