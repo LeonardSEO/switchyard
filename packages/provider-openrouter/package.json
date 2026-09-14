@@ -33,8 +33,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "prepare": "npm run build"
+    "build": "tsc -p tsconfig.build.json"
   },
   "keywords": [
     "openrouter",
