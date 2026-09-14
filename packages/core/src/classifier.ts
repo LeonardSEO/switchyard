@@ -102,6 +102,14 @@ export interface ClassifierFloors {
   /** A classifier that is rate-limited or answers hours later is no use. */
   allowFreeTier?: boolean;
   allowBatch?: boolean;
+  /**
+   * Require a published capability score. Default true: an unmeasured model is
+   * a guess, and a router should not guess about the component that decides
+   * every other decision.
+   */
+  requireBenchmark?: boolean;
+  /** Minimum published capability (0..1) for the classifier. */
+  minCapabilityScore?: number;
 }
 
 export const defaultClassifierFloors: ClassifierFloors = {
@@ -109,6 +117,8 @@ export const defaultClassifierFloors: ClassifierFloors = {
   requireStructuredOutput: true,
   allowFreeTier: false,
   allowBatch: false,
+  requireBenchmark: true,
+  minCapabilityScore: 0.2,
 };
 
 /**
@@ -133,6 +143,12 @@ export function pickCheapestClassifier(
     if (!floors.allowFreeTier && m.freeTier) continue;
     if (!floors.allowBatch && m.batchOnly) continue;
     if (floors.requireStructuredOutput && m.capabilities?.structuredOutput !== true) continue;
+    // Unmeasured means unknown, and unknown cannot be trusted with the
+    // decision that gates every other decision.
+    if (floors.requireBenchmark !== false) {
+      if (m.capabilityScore === undefined) continue;
+      if (m.capabilityScore < (floors.minCapabilityScore ?? 0)) continue;
+    }
     if (tierRank[m.tier] < minTier) continue;
     const price = m.pricing.inputPer1M.known ? m.pricing.inputPer1M.value : Infinity;
     if (price < bestPrice) {

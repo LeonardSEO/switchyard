@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   capacityBlocked,
+  defaultClassifierFloors,
   defaultQuotaConfig,
   effectiveInputPer1M,
   filterCandidates,
@@ -22,6 +23,7 @@ const api = (id: string, tier: string, inUsd: number, outUsd: number): ModelCapa
   tier: tier as ModelCapabilities["tier"],
   maxContextTokens: 200_000,
   supportsTools: ["bash", "read", "write", "edit"],
+  capabilityScore: 0.5,
   capabilities: { structuredOutput: true, toolCalling: true },
   pricing: {
     kind: "api",
@@ -184,6 +186,17 @@ describe("classifier", () => {
     const noJson = { ...api("nojson", "small", 0.001, 0.002), capabilities: { structuredOutput: false } };
     const good = api("good", "small", 0.05, 0.1);
     expect(pickCheapestClassifier([free, batch, noJson, good])?.id).toBe("good");
+  });
+
+  it("refuses an unmeasured classifier and one below the capability floor", () => {
+    const unmeasured = { ...api("mystery", "small", 0.001, 0.002), capabilityScore: undefined };
+    const weak = { ...api("weak", "small", 0.002, 0.004), capabilityScore: 0.05 };
+    const ok = { ...api("ok", "small", 0.05, 0.1), capabilityScore: 0.3 };
+    expect(pickCheapestClassifier([unmeasured, weak, ok])?.id).toBe("ok");
+    // Opting out is possible, but it is deliberate, not default.
+    expect(
+      pickCheapestClassifier([unmeasured, ok], { ...defaultClassifierFloors, requireBenchmark: false })?.id,
+    ).toBe("mystery");
   });
 
   it("does not call a model when the deterministic answer is confident", async () => {
