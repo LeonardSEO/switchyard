@@ -154,3 +154,95 @@ describe("openrouter attribution", () => {
     expect(seen[0].referer).toContain("github.com");
   });
 });
+
+describe("subscription capacity in the gateway", () => {
+  it("runs a subscription-routed request on the Codex backend, not upstream", async () => {
+    let upstreamHits = 0;
+    const echo = createServer((_req, res) => {
+      upstreamHits += 1;
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { content: "from upstream" } }] }));
+    });
+    await new Promise<void>((r) => echo.listen(0, "127.0.0.1", r));
+    servers.push(echo);
+    const port = (echo.address() as { port: number }).port;
+
+    const sol: ModelCapabilities = {
+      id: "codex-sol",
+      provider: "codex-subscription",
+      tier: "large",
+      capabilityScore: 0.774,
+      maxContextTokens: 400_000,
+      pricing: {
+        kind: "subscription",
+        inputPer1M: { known: false },
+        outputPer1M: { known: false },
+        planAmortizedPer1M: { known: true, value: 0.5 },
+      },
+    };
+
+    gateway = await createGateway({
+      models: [...pool, sol],
+      upstreamBaseUrl: `http://127.0.0.1:${port}/v1`,
+      apiKey: "k",
+      executeSubscription: async () => ({ text: "from subscription" }),
+    });
+
+    const res = await fetch(`http://127.0.0.1:${gateway.port}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "switchyard/auto",
+        messages: [{ role: "user", content: "Rewrite the billing service from scratch as a scalable event-driven system" }],
+      }),
+    });
+    const json = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+    expect(res.headers.get("x-switchyard-model")).toBe("codex-sol");
+    expect(json.choices[0].message.content).toBe("from subscription");
+    expect(upstreamHits).toBe(0);
+  });
+
+  it("fails over to API routing when the Codex backend errors", async () => {
+    const echo = createServer((_req, res) => {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ choices: [{ message: { content: "from upstream" } }] }));
+    });
+    await new Promise<void>((r) => echo.listen(0, "127.0.0.1", r));
+    servers.push(echo);
+    const port = (echo.address() as { port: number }).port;
+
+    const sol: ModelCapabilities = {
+      id: "codex-sol",
+      provider: "codex-subscription",
+      tier: "large",
+      capabilityScore: 0.774,
+      pricing: {
+        kind: "subscription",
+        inputPer1M: { known: false },
+        outputPer1M: { known: false },
+        planAmortizedPer1M: { known: true, value: 0.5 },
+      },
+    };
+
+    gateway = await createGateway({
+      models: [...pool, sol],
+      upstreamBaseUrl: `http://127.0.0.1:${port}/v1`,
+      apiKey: "k",
+      executeSubscription: async () => {
+        throw new Error("codex backend 500");
+      },
+    });
+
+    const res = await fetch(`http://127.0.0.1:${gateway.port}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "switchyard/auto",
+        messages: [{ role: "user", content: "Rewrite the billing service from scratch as a scalable event-driven system" }],
+      }),
+    });
+    const json = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+    expect(res.status).toBe(200);
+    expect(json.choices[0].message.content).toBe("from upstream");
+  });
+});

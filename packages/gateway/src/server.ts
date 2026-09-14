@@ -14,7 +14,7 @@ import {
   type CapacityState,
   type ModelCapabilities,
 } from "@vepando/switchyard-core";
-import { buildSnapshot } from "@vepando/switchyard-catalog";
+import { buildSnapshot, executeCodex } from "@vepando/switchyard-catalog";
 import { createOpenRouterCompletion } from "@vepando/switchyard-provider-openrouter";
 import { extractObjective, modelList, rewriteRequest, type ChatRequest } from "./router.js";
 
@@ -33,6 +33,11 @@ export interface GatewayOptions {
   capacity?: Record<string, CapacityState>;
   /** Override the default OpenRouter app attribution. */
   attribution?: Attribution;
+  /** Execute a subscription-routed request (injectable for tests). */
+  executeSubscription?: (
+    messages: Array<{ role?: string; content?: unknown }>,
+    model: ModelCapabilities,
+  ) => Promise<{ text: string }>;
 }
 
 const DEFAULT_FRESHNESS_MS = 10 * 60 * 1000;
@@ -155,6 +160,29 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
         return;
       }
 
+      // Subscription capacity runs on the Codex backend, not upstream.
+      if (decision.model.pricing.kind === "subscription") {
+        const run = opts.executeSubscription ?? executeCodex;
+        try {
+          const result = await run(body.messages ?? [], decision.model);
+          const payload = completion(body, decision.model, result.text);
+          res.writeHead(200, {
+            "content-type": body.stream ? "text/event-stream" : "application/json",
+            "x-switchyard-model": decision.model.id,
+            "x-switchyard-complexity": decision.complexity,
+          });
+          res.end(
+            body.stream
+              ? `data: ${JSON.stringify({ ...payload, object: "chat.completion.chunk" })}\n\ndata: [DONE]\n\n`
+              : JSON.stringify(payload),
+          );
+          return;
+        } catch (err) {
+          // Fail over to API routing rather than break the turn.
+          console.warn(`[switchyard] codex execution failed: ${(err as Error).message}`);
+        }
+      }
+
       const { body: forwarded } = rewriteRequest(body, decision.model);
 
       if (url.searchParams.has("explain") || body.model === "switchyard/explain") {
@@ -216,6 +244,23 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
     port,
     close: () => new Promise<void>((resolve) => server.close(() => resolve())),
     handle,
+  };
+}
+
+function completion(
+  body: ChatRequest,
+  model: ModelCapabilities,
+  text: string,
+) {
+  return {
+    id: `chatcmpl-switchyard-${Date.now()}`,
+    object: "chat.completion",
+    created: Math.floor(Date.now() / 1000),
+    model: body.model ?? model.id,
+    choices: [
+      { index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" },
+    ],
+    usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   };
 }
 

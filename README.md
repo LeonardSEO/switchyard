@@ -65,10 +65,11 @@ Point your tool at that URL with model `switchyard/auto`.
 and the benchmark scores come from, and where most routing decisions are made.
 You need an OpenRouter API key (or an OpenRouter login your harness already has).
 
-Codex subscription support is **optional and, for now, only in the Pi adapter**:
-if you are logged into ChatGPT via `codex login`, Switchyard reads your real
-quota and treats Luna/Terra/Sol/Astra as candidates alongside the API catalog.
-Without that login, nothing changes — everything routes over OpenRouter.
+Codex subscription support is **optional** and works in both the Pi adapter and
+the gateway: if you are logged into ChatGPT via `codex login`, Switchyard reads
+your real quota and treats Luna/Terra/Sol/Astra as candidates alongside the API
+catalog. Execution then happens on the Codex backend with that same login — no
+new keys. Without the login, nothing changes: everything routes over OpenRouter.
 
 Subscription capacity is priced, never assumed free:
 
@@ -160,8 +161,9 @@ in Pi.
 ## Status
 
 Early. The eval corpus is small (10 fitting + 12 held-out), so accuracy figures
-are indicative. The gateway routes over API providers only. Only Pi and OpenCode
-are supported today.
+are indicative. The Codex execution path uses an undocumented backend: it falls
+back to API routing if that backend ever changes. Only Pi and OpenCode are
+supported today.
 
 ## License
 

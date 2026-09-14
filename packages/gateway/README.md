@@ -26,10 +26,13 @@ x-switchyard-complexity: trivial
 
 `?explain=1` returns the decision as JSON without executing it.
 
-## Scope
+## Subscription capacity
 
-Routes over **OpenRouter and other OpenAI-compatible API providers**. Codex
-subscription capacity is not in the gateway yet (it is in the Pi adapter).
+With `codex login` present, the gateway treats Luna/Terra/Sol/Astra as candidates
+and executes them on the Codex backend using that same login — no new keys. If
+the backend fails, the request falls back to API routing instead of breaking.
+
+Without a Codex login, everything routes over OpenRouter.
 
 ## Attribution
 
