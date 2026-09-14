@@ -85,7 +85,15 @@ export function inferComplexity(
   }
 
   const complexity: Complexity =
-    score >= 4 ? "complex" : score >= 1 ? "moderate" : "simple";
+    score >= 7
+      ? "frontier"
+      : score >= 4
+        ? "complex"
+        : score >= 1
+          ? "moderate"
+          : score <= -3
+            ? "trivial"
+            : "simple";
   return { complexity, score, matched, source: "inferred" };
 }
 

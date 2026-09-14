@@ -1,4 +1,4 @@
-import type { CapacityState, ModelCapabilities } from "@switchyard/core";
+import type { CapacityState, ModelCapabilities, Usage } from "@switchyard/core";
 
 /**
  * Codex subscription capacity (ChatGPT Plus/Pro).
@@ -103,22 +103,39 @@ export async function detectCodexEnvironment(
   return { hasBinary, hasLogin };
 }
 
+export interface CodexSourceOptions {
+  /** Measured quota, when a usage source could read it. */
+  usage?: Usage;
+  /** Models the usage endpoint reports as unavailable right now. */
+  unavailableIds?: string[];
+}
+
 export class CodexSubscriptionSource {
   readonly id = "codex-subscription";
 
   constructor(
     private readonly models: CodexModelSpec[] = defaultCodexModels,
     private readonly env: CodexEnvironment = { hasBinary: false, hasLogin: false },
+    private readonly opts: CodexSourceOptions = {},
   ) {}
 
-  /** A detected login is not proof of remaining quota: capacity stays unknown. */
+  /**
+   * A detected login is not proof of remaining quota. With a usage reading we
+   * report the measured window; without one, capacity stays unknown rather than
+   * assumed full.
+   */
   list(): { models: ModelCapabilities[]; capacity: Record<string, CapacityState> } {
     const usable = this.env.hasBinary && this.env.hasLogin;
+    const blocked = new Set(this.opts.unavailableIds ?? []);
     const capacity: Record<string, CapacityState> = {};
     const models = this.models.map<ModelCapabilities>((m) => {
-      capacity[m.id] = usable
-        ? { available: "unknown", reason: "logged in; quota not measured" }
-        : { available: false, reason: "codex CLI or ChatGPT login not detected" };
+      capacity[m.id] = !usable
+        ? { available: false, reason: "codex CLI or ChatGPT login not detected" }
+        : blocked.has(m.id)
+          ? { available: false, reason: "usage endpoint reports this model unavailable" }
+          : this.opts.usage
+            ? { available: true, usage: this.opts.usage }
+            : { available: "unknown", reason: "logged in; quota not measured" };
       return {
         id: m.id,
         provider: this.id,

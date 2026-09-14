@@ -12,6 +12,7 @@ import { filterCandidates, type FilterContext, type PrunedCandidate } from "./fi
 import {
   defaultWeights,
   DEMAND_BY_COMPLEXITY,
+  OVERQUALIFICATION_BAND,
   effortForComplexity,
   scoreCandidate,
   type Weights,
@@ -116,6 +117,43 @@ export function route(
       };
     })
     .sort((a, b) => b.score - a.score);
+
+  // Frontier band. When a task demands more than almost anything can do, the
+  // few models that come close are within benchmark noise of each other. Credit
+  // them equally and let price decide: that is the Pareto answer, and it stops
+  // a 0.05 capability gap from justifying a 5x price gap.
+  const capabilities = ranked
+    .map((r) => r.model.capabilityScore)
+    .filter((c): c is number => c !== undefined);
+  if (capabilities.length > 1) {
+    const maxCapability = Math.max(...capabilities);
+    const demand = DEMAND_BY_COMPLEXITY[complexity] ?? DEMAND_BY_COMPLEXITY.moderate;
+    if (demand >= maxCapability - OVERQUALIFICATION_BAND) {
+      const band = maxCapability - OVERQUALIFICATION_BAND;
+      for (const r of ranked) {
+        const rescored = scoreCandidate(
+          priced,
+          kind,
+          r.model,
+          opts.capacity?.[r.model.id],
+          opts.signals?.[`${r.model.id}|${kind}`] ?? opts.signals?.[r.model.id],
+          cfg,
+          weights,
+          demand,
+          band,
+        );
+        Object.assign(r, {
+          score: rescored.score,
+          costFit: rescored.costFit,
+          pFail: rescored.pFail,
+          expectedCostUsd: rescored.expectedCostUsd,
+          qualityScore: rescored.qualityScore,
+          reliability: rescored.reliability,
+        });
+      }
+      ranked.sort((a, b) => b.score - a.score);
+    }
+  }
 
   // Relative expected cost. An absolute fit normalised against the failure cost
   // compresses every candidate to ~0.99 once failure is cheap, which quietly

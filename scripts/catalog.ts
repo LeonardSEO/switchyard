@@ -8,35 +8,24 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 import { keywordClassification, route, type TaskSpec } from "@switchyard/core";
-import { OpenRouterSource } from "@switchyard/provider-openrouter";
-import {
-  Catalog,
-  CodexSubscriptionSource,
-  OpenAICompatibleSource,
-  detectCodexEnvironment,
-  signalsFromCatalog,
-  stats,
-} from "@switchyard/catalog";
+import { signalsFromCatalog, stats } from "@switchyard/catalog";
+import { buildSnapshot } from "./build-catalog";
 
 const force = process.argv.includes("--force");
-
-const sources = [
-  new OpenRouterSource(),
-  // Present on many machines, zero cost per token when it is.
-  new OpenAICompatibleSource({ id: "ollama", baseUrl: "http://localhost:11434/v1" }),
-  new OpenAICompatibleSource({ id: "lm-studio", baseUrl: "http://localhost:1234/v1" }),
-];
-
-const codexEnv = await detectCodexEnvironment();
-const codex = new CodexSubscriptionSource(undefined, codexEnv);
-
-const catalog = new Catalog(sources, codex);
-const snapshot = await catalog.refresh(force);
+const snapshot = await buildSnapshot(force);
 
 console.log("=== sources ===");
 for (const s of snapshot.status) {
   console.log(
     `${s.source.padEnd(20)} ${String(s.count).padStart(5)} models${s.stale ? "  [STALE]" : ""}${s.note ? `  ${s.note}` : ""}`,
+  );
+}
+
+console.log("\n=== codex subscription ===");
+console.log(`quota: ${snapshot.usage.note}  [${snapshot.usage.source}]`);
+for (const m of snapshot.matches) {
+  console.log(
+    `  ${m.id.padEnd(13)} capability=${m.capability?.toFixed(3) ?? "?"}  ${m.origin.padEnd(9)} ${m.matchedCatalogId ?? "(no catalog match)"}`,
   );
 }
 
@@ -47,38 +36,36 @@ console.log(`with coding benchmark ${s.withCapabilityScore}`);
 console.log(`with known price      ${s.withKnownPrice}`);
 console.log(`free variants         ${s.free}`);
 console.log(`by tier               ${JSON.stringify(s.byTier)}`);
-console.log("cheapest per tier:");
-for (const [tier, c] of Object.entries(s.cheapestPerTier)) {
-  console.log(`  ${tier.padEnd(8)} ${c ? `${c.id} $${c.usdPer1M.toFixed(3)}/M` : "-"}`);
-}
 
-// Cold-start routing across the whole pool: benchmark scores are the only
-// quality signal available on a fresh install.
 const signals = signalsFromCatalog(snapshot.models);
+console.log("\n=== cold-start routing over the full pool ===");
 const demos: Array<[string, TaskSpec]> = [
   ["rename", { objective: "Rename the variable total to orderTotal in the checkout module." }],
-  [
-    "feature",
-    { objective: "Implement pagination for the orders API endpoint.", risk: "medium" },
-  ],
+  ["feature", { objective: "Implement pagination for the orders API endpoint.", risk: "medium" }],
   [
     "hard debug",
     {
       objective: "Debug the intermittent deadlock in the distributed event pipeline.",
+      complexity: "complex",
+      risk: "high",
+    },
+  ],
+  [
+    "full rewrite",
+    {
+      objective: "Rewrite the billing service from scratch as a scalable event-driven system.",
       risk: "high",
     },
   ],
 ];
-
-console.log("\n=== cold-start routing over the full pool ===");
 for (const [label, task] of demos) {
   const cls = keywordClassification(task);
   const d = route(task, snapshot.models, cls, { signals, capacity: snapshot.capacity });
   const cost = d.ranked[0]?.estCostUsd;
   console.log(
-    `${label.padEnd(11)} ${cls.complexity.padEnd(9)} -> ${d.model?.id ?? "none"}` +
+    `${label.padEnd(12)} ${cls.complexity.padEnd(9)} -> ${d.model?.id ?? "none"}` +
       `  est ${cost?.known ? `$${cost.value.toFixed(6)}` : "?"}  effort=${d.effort}` +
-      `  admission=${d.admissionRequired ? "y" : "n"}  (${d.ranked.length} candidates, ${d.pruned.length} pruned)`,
+      `  (${d.ranked.length} candidates, ${d.pruned.length} pruned)`,
   );
 }
 

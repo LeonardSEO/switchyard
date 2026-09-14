@@ -65,10 +65,11 @@ describe("complexity", () => {
     expect(inferKind("design a migration plan")).toBe("plan");
   });
 
-  it("matches veto's thresholds", () => {
-    expect(keywordClassification({ objective: "build e2e CQRS infrastructure with event sourcing" }).complexity).toBe("complex");
+  it("matches veto's thresholds and extends them with two rungs", () => {
+    expect(keywordClassification({ objective: "build e2e CQRS infrastructure with event sourcing" }).complexity).toBe("frontier");
     expect(keywordClassification({ objective: "implement authentication service" }).complexity).toBe("moderate");
     expect(keywordClassification({ objective: "create simple html page" }).complexity).toBe("simple");
+    expect(keywordClassification({ objective: "create a simple hello world page" }).complexity).toBe("trivial");
   });
 
   it("flags answers near a threshold as uncertain", () => {
@@ -135,8 +136,9 @@ describe("scoring", () => {
 
   it("prunes tiers below the complexity floor", () => {
     const task = { objective: "design microservices architecture", kind: "plan" as const };
-    const d = route(task, [cheap, mid, large], keywordClassification(task));
-    expect(d.complexity).toBe("complex");
+    const strong = { ...large, capabilityScore: 0.8 };
+    const d = route(task, [cheap, mid, strong], keywordClassification(task));
+    expect(d.complexity).toBe("frontier");
     expect(d.model?.id).toBe("strong-large");
     expect(d.pruned.map((p) => p.model.id)).toEqual(["cheap-small", "balanced-mid"]);
   });

@@ -13,10 +13,41 @@ export const CHEAP_FLOOR_PER_1M = 0.01;
  * absolute score. A weak model is perfectly reliable at a trivial rename.
  */
 export const DEMAND_BY_COMPLEXITY: Record<string, number> = {
+  trivial: 0.15,
   simple: 0.25,
-  moderate: 0.5,
-  complex: 0.75,
+  moderate: 0.45,
+  complex: 0.65,
+  frontier: 0.8,
 };
+
+/**
+ * Capability a task must clear, beyond the coarse tier gate. Only applied to
+ * models that publish a score: an unmeasured model is filtered by tier, not by
+ * a number it cannot report.
+ */
+export const MIN_CAPABILITY_BY_COMPLEXITY: Record<string, number> = {
+  trivial: 0,
+  simple: 0,
+  moderate: 0.3,
+  complex: 0.5,
+  frontier: 0.7,
+};
+
+/**
+ * Capability beyond what a task demands earns nothing. A 0.82 model is not
+ * measurably better than a 0.77 model on a task that needs 0.65 — the gap is
+ * within benchmark noise, and paying 5x for it is not a decision, it is
+ * superstition. Capping it makes the frontier a band, and within that band the
+ * cheapest model wins. That is what "Pareto-optimal frontier" means here.
+ */
+export const OVERQUALIFICATION_BAND = 0.05;
+
+/** Assumed capability when nothing is published: mediocre, not average. */
+export const UNMEASURED_CAPABILITY = 0.4;
+
+export function effectiveCapability(capability: number, demand: number): number {
+  return Math.min(capability, demand + OVERQUALIFICATION_BAND);
+}
 
 /**
  * Probability that an attempt fails, from the gap between demand and measured
@@ -183,11 +214,19 @@ export function scoreCandidate(
   cfg: QuotaConfig,
   weights: Weights = defaultWeights,
   demand: number = DEMAND_BY_COMPLEXITY.moderate,
+  /** Hard ceiling on credited capability, used for the frontier band. */
+  qualityCap?: number,
 ): ScoreBreakdown {
   const inPrice = effectiveInputPer1M(m, cap, cfg);
   const estCost = estimateCostUsd(m, task, cap, signal, cfg);
-  // History beats benchmarks, benchmarks beat nothing.
-  const quality = signal?.successRate ? signal.successRate : m.capabilityScore;
+  // History beats benchmarks, benchmarks beat nothing. Capability above what
+  // the task demands is capped: it is noise, not value.
+  const raw = signal?.successRate ? signal.successRate : m.capabilityScore;
+  const ceiling = Math.min(demand + OVERQUALIFICATION_BAND, qualityCap ?? Number.POSITIVE_INFINITY);
+  // Unmeasured gets the same ceiling, otherwise being measured would count
+  // against a model on tasks that need almost nothing.
+  const quality =
+    raw === undefined ? undefined : Math.min(raw ?? UNMEASURED_CAPABILITY, ceiling);
   const pFail = failureProbability(quality, demand);
   const fit =
     task.failureCostUsd && task.failureCostUsd > 0
@@ -226,7 +265,13 @@ const EFFORT_LADDER: ReasoningEffort[] = ["off", "minimal", "low", "medium", "hi
 
 export function effortForComplexity(complexity: string, risk: Risk | undefined): ReasoningEffort {
   const base: ReasoningEffort =
-    complexity === "complex" ? "high" : complexity === "moderate" ? "medium" : "low";
+    complexity === "frontier"
+      ? "xhigh"
+      : complexity === "complex"
+        ? "high"
+        : complexity === "moderate"
+          ? "medium"
+          : "low";
   const bumped = risk === "high" ? EFFORT_LADDER[Math.min(EFFORT_LADDER.indexOf(base) + 1, EFFORT_LADDER.length - 1)] : base;
   return bumped;
 }

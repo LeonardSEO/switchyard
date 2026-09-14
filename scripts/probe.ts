@@ -18,26 +18,13 @@ import {
   type TaskSpec,
 } from "@switchyard/core";
 import { OpenRouterSource } from "@switchyard/provider-openrouter";
-import {
-  Catalog,
-  CodexSubscriptionSource,
-  OpenAICompatibleSource,
-  detectCodexEnvironment,
-  loadCodexModels,
-  signalsFromCatalog,
-} from "@switchyard/catalog";
+import { signalsFromCatalog } from "@switchyard/catalog";
+import { buildSnapshot } from "./build-catalog";
 
-const { models: codexModels } = await loadCodexModels();
-const catalog = new Catalog(
-  [
-    new OpenRouterSource(),
-    new OpenAICompatibleSource({ id: "ollama", baseUrl: "http://localhost:11434/v1" }),
-  ],
-  new CodexSubscriptionSource(codexModels, await detectCodexEnvironment()),
-);
-const snapshot = await catalog.refresh();
+const snapshot = await buildSnapshot();
 const models = snapshot.models;
 const signals = signalsFromCatalog(models);
+console.log(`codex quota: ${snapshot.usage.note}  [${snapshot.usage.source}]`);
 
 const price = (m: ModelCapabilities): number | undefined => {
   const p = effectiveInputPer1M(m, snapshot.capacity[m.id]);

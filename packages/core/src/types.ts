@@ -15,7 +15,13 @@ export type TaskKind =
   | "plan"
   | "code-change";
 
-export type Complexity = "simple" | "moderate" | "complex";
+/**
+ * Five rungs, not three. Veto's simple/moderate/complex collapses "rename a
+ * variable" and "add a retry" into one bucket, and puts a single-file refactor
+ * next to a distributed rewrite. The rung sets what a task demands, and demand
+ * is what a model has to clear.
+ */
+export type Complexity = "trivial" | "simple" | "moderate" | "complex" | "frontier";
 export type Risk = "low" | "medium" | "high";
 
 /** "unknown" is explicit: metadata that does not declare a tier must not be

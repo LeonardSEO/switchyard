@@ -8,7 +8,7 @@ import type {
 } from "./types";
 import { tierMeetsComplexity } from "./complexity";
 import { capacityBlocked, defaultQuotaConfig, effectiveInputPer1M, type QuotaConfig } from "./quota";
-import { estimateCostUsd } from "./scorer";
+import { estimateCostUsd, MIN_CAPABILITY_BY_COMPLEXITY } from "./scorer";
 
 export interface PrunedCandidate {
   model: ModelCapabilities;
@@ -78,6 +78,14 @@ function rejectionReason(
 
   if (!tierMeetsComplexity(m.tier, complexity)) {
     return `tier ${m.tier} below complexity ${complexity}`;
+  }
+
+  // Capability floor, but only for models that publish one. Unmeasured models
+  // are already gated by tier; refusing them here would silently delete every
+  // model we have no benchmark for.
+  const floor = MIN_CAPABILITY_BY_COMPLEXITY[complexity] ?? 0;
+  if (floor > 0 && m.capabilityScore !== undefined && m.capabilityScore < floor) {
+    return `capability ${m.capabilityScore.toFixed(2)} below floor ${floor} for ${complexity}`;
   }
 
   if (task.maxCostUsd && task.maxCostUsd > 0) {
