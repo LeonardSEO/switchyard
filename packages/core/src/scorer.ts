@@ -102,6 +102,7 @@ export interface ScoreBreakdown {
   score: number;
   costFit: number;
   kindMatch: number;
+  reliability: number;
   estCostUsd: Known<number>;
 }
 
@@ -119,13 +120,22 @@ export function scoreCandidate(
   const fit = costFit(inPrice, estCost, task.maxCostUsd);
   const km = kindMatch(m, kind);
   const s = signal;
-  const total =
+  const quality =
     km * weights.kind +
     (s?.successRate ?? 0) * weights.success +
     fit * weights.cost +
     (1 - (s?.rejectRate ?? 0)) * weights.reject +
     (s?.evalScore ?? 0) * weights.eval;
-  return { score: total, costFit: fit, kindMatch: km, estCostUsd: estCost };
+  // Expected retries are a cost too: a rate-limited free tier that fails twice
+  // before succeeding is not cheaper than a reliable $0.06/M model.
+  const reliability = m.reliability ?? 1;
+  return {
+    score: quality * reliability,
+    costFit: fit,
+    kindMatch: km,
+    reliability,
+    estCostUsd: estCost,
+  };
 }
 
 const EFFORT_LADDER: ReasoningEffort[] = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];

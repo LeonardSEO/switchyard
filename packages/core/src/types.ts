@@ -83,6 +83,26 @@ export interface ModelCapabilities {
   provider: string;
   displayName?: string;
   tier: Tier;
+  /**
+   * 0..1 coding capability from a public benchmark when available. This is the
+   * cold-start quality prior: it replaces guesswork before any history exists.
+   */
+  capabilityScore?: number;
+  /** Declared request-level capabilities (function calling, schema output, ...). */
+  capabilities?: {
+    toolCalling?: boolean;
+    structuredOutput?: boolean;
+    reasoning?: boolean;
+    reasoningEfforts?: string[];
+  };
+  /** Free or rate-limited variant: the price is a known zero, capacity is not. */
+  freeTier?: boolean;
+  /**
+   * 0..1, default 1. Probability-ish weight for "this call will just work".
+   * Rate-limited free tiers, flaky endpoints and unmeasured capacity score
+   * below 1: a cheap model that needs three retries is not cheap.
+   */
+  reliability?: number;
   /** Omit when unknown; a smaller number than the task needs prunes the model. */
   maxContextTokens?: number;
   /** Omit when unknown; `[]` means "known to support no tools". */
