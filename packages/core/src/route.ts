@@ -19,6 +19,23 @@ import {
 } from "./scorer";
 import { defaultQuotaConfig, type QuotaConfig } from "./quota";
 
+/**
+ * Deterministic ordering. Two candidates can be genuinely indistinguishable —
+ * same credited quality, same price — and then the catalog's input order used to
+ * decide, which once picked gemini-3.7-flash over the identical-priced 3.8 with
+ * a better benchmark. Ties now go to better evidence, then lower price, then id.
+ */
+export function compareCandidates(a: RankedCandidate, b: RankedCandidate): number {
+  if (b.score !== a.score) return b.score - a.score;
+  const ca = a.model.capabilityScore ?? -1;
+  const cb = b.model.capabilityScore ?? -1;
+  if (cb !== ca) return cb - ca;
+  const pa = a.pricePer1M.known ? a.pricePer1M.value : Number.POSITIVE_INFINITY;
+  const pb = b.pricePer1M.known ? b.pricePer1M.value : Number.POSITIVE_INFINITY;
+  if (pa !== pb) return pa - pb;
+  return a.model.id.localeCompare(b.model.id);
+}
+
 export interface RankedCandidate {
   model: ModelCapabilities;
   score: number;
@@ -29,6 +46,7 @@ export interface RankedCandidate {
   expectedCostUsd: Known<number>;
   qualityScore: number;
   reliability: number;
+  pricePer1M: Known<number>;
 }
 
 export interface RouteDecision {
@@ -133,12 +151,13 @@ export function route(
         kindMatch: s.kindMatch,
         estCostUsd: s.estCostUsd,
         pFail: s.pFail,
+        pricePer1M: s.pricePer1M,
         expectedCostUsd: s.expectedCostUsd,
         qualityScore: s.qualityScore,
         reliability: s.reliability,
       };
     })
-    .sort((a, b) => b.score - a.score);
+    .sort(compareCandidates);
 
   // Frontier band. When a task demands more than almost anything can do, the
   // few models that come close are within benchmark noise of each other. Credit
@@ -173,7 +192,7 @@ export function route(
           reliability: rescored.reliability,
         });
       }
-      ranked.sort((a, b) => b.score - a.score);
+      ranked.sort(compareCandidates);
     }
   }
 
@@ -196,7 +215,7 @@ export function route(
       r.costFit = relative;
       r.score = (r.qualityScore - previous * weights.cost + relative * weights.cost) * r.reliability;
     }
-    ranked.sort((a, b) => b.score - a.score);
+    ranked.sort(compareCandidates);
   }
 
 // Prefer capacity you already paid for — but only where that is justified.

@@ -205,6 +205,20 @@ describe("scoring", () => {
     expect(route(trivial, [cash, sub], keywordClassification(trivial)).model?.id).toBe("cash-large");
   });
 
+  it("breaks ties on measured capability, never on catalog order", () => {
+    // Same price, same context, different benchmark: the better one must win,
+    // and it must win regardless of the order they arrive in.
+    const weaker = { ...api("gemini-3.7-flash", "mid", 0.75, 3.75), capabilityScore: 0.761 };
+    const stronger = { ...api("gemini-3.8-flash", "mid", 0.75, 3.75), capabilityScore: 0.763 };
+    const task = {
+      objective: "implement pagination, filtering and sorting for the orders API",
+      complexity: "advanced" as const,
+    };
+    const cls = keywordClassification(task);
+    expect(route(task, [weaker, stronger], cls).model?.id).toBe("gemini-3.8-flash");
+    expect(route(task, [stronger, weaker], cls).model?.id).toBe("gemini-3.8-flash");
+  });
+
   it("fails closed when nothing survives", () => {
     const task = { objective: "design a distributed system", kind: "plan" as const };
     const d = route(task, [cheap], keywordClassification(task));

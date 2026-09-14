@@ -227,6 +227,8 @@ export interface ScoreBreakdown {
   estCostUsd: Known<number>;
   /** Probability this attempt fails, from demand vs measured capability. */
   pFail: number;
+  /** Effective input price used, for display and deterministic tie-breaks. */
+  pricePer1M: Known<number>;
   /** Token cost plus expected failure cost, when a failure cost is declared. */
   expectedCostUsd: Known<number>;
 }
@@ -286,6 +288,7 @@ export function scoreCandidate(
     reliability,
     estCostUsd: estCost,
     pFail,
+    pricePer1M: inPrice,
     expectedCostUsd:
       task.failureCostUsd && task.failureCostUsd > 0
         ? expectedCostUsd(estCost, pFail, task.failureCostUsd)
