@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "author": "LeonardSEO",
-  "description": "OpenCode plugin: route every prompt through Switchyard",
+  "description": "OpenCode plugin: route every prompt through Switchyard, across OpenRouter's catalog and your Codex subscription",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -23,12 +23,21 @@
     "prepare": "npm run build"
   },
   "keywords": [
-    "pi-package",
-    "pi",
     "opencode",
     "opencode-plugin",
     "model-router",
-    "llm"
+    "llm-router",
+    "ai-router",
+    "model-routing",
+    "llm",
+    "ai",
+    "coding-agent",
+    "ai-coding",
+    "openrouter",
+    "codex",
+    "cost-optimization",
+    "cost-aware",
+    "developer-tools"
   ],
   "repository": {
     "type": "git",

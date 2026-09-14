@@ -1,37 +1,60 @@
 # @vepando/switchyard
 
-Pi package: route every turn to the model that should take it — across OpenRouter
-(primary) and, optionally, the Codex subscription you already pay for.
+Switchyard as a Pi package: route every turn to the model that should take it —
+across OpenRouter (primary) and, optionally, the Codex subscription you already
+pay for.
 
 ```bash
 pi install npm:@vepando/switchyard
 ```
 
-Pi keeps its permissions, tools, MCP, sessions and authentication. This package
-answers two questions per turn: **which model**, and **how hard it should think**
-(`minimal` → `max`). Then it records what happened, so later turns route on
-evidence instead of on prices.
+## What it does
 
-## OpenRouter first
+Pi keeps its permissions, tools, MCP, sessions and authentication. On every turn
+this package answers exactly two questions:
 
-The catalog, prices and benchmark scores come from OpenRouter. You need an
+1. **Which model** should take this turn?
+2. **How hard should it think?** — reasoning effort from `minimal` to `max`.
+
+Then it records what happened, so later turns route on evidence instead of on
+prices alone. Most turns classify with a cheap model call that is cached on
+disk; classification sends only the objective, capped at 4000 characters —
+never your files, repository context or history. Set `escalation: "never"` to
+keep everything local and deterministic.
+
+## OpenRouter first, Codex optional
+
+The catalog, prices and benchmark scores come from OpenRouter; you need an
 OpenRouter key or an OpenRouter login Pi already has.
 
-Codex support is optional: with `codex login` present, Switchyard reads your real
-quota and adds Luna/Terra/Sol/Astra as candidates. Quota is priced, not assumed
-free — nearly-drained quota is held back, with the last 10% of a window reserved.
+Codex support activates automatically when `codex login` is present: Switchyard
+reads your real quota and adds Luna/Terra/Sol/Astra as candidates alongside the
+API catalog. Quota is priced, never assumed free — capacity that will expire
+unused is nearly free, while the last 10% of a window is reserved.
 
 ## Configuration
 
 Everything is optional.
 
-- `escalation: "never"` — no classification calls; objectives stay local.
-- `classifierModel: "<id>"` — pin the classifier.
-- `failureCostByRisk` — cost of a failed attempt, per risk level.
+- `escalation` — `"always"` (default), `"uncertain"`, or `"never"` for offline
+  and private use.
+- `classifierModel: "<id>"` — pin the classifier instead of letting price,
+  benchmark and measured latency decide.
+- `failureCostByRisk` — what a failed attempt costs you, per risk level.
+- `outcomeFile`, `cacheFile` — custom paths for the outcome log and
+  classification cache (defaults live under `~/.switchyard/`).
+
+## What you see
+
+A notification per decision, e.g.:
+
+```
+switchyard → deepseek/deepseek-v4-flash (moderate, effort medium, $0.060/M)
+```
 
 ## Attribution
 
-Every request this package makes carries OpenRouter app attribution:
+Every upstream request carries OpenRouter app attribution:
 
 ```http
 HTTP-Referer: https://github.com/LeonardSEO/switchyard
@@ -40,6 +63,10 @@ X-Title: Switchyard
 
 Overridable with `SWITCHYARD_APP_URL` and `SWITCHYARD_APP_TITLE`.
 
-## Docs
+## Requirements
 
-Full documentation: https://github.com/LeonardSEO/switchyard#readme
+Node 20+, Pi. An OpenRouter key; optionally `codex login`.
+
+## License
+
+[Apache-2.0](https://github.com/LeonardSEO/switchyard/blob/main/LICENSE)

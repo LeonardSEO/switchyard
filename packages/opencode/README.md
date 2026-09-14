@@ -1,13 +1,17 @@
 # @vepando/switchyard-opencode
 
-OpenCode plugin that routes every prompt through Switchyard — across OpenRouter's
-catalog (primary), with Codex subscription support arriving later.
+OpenCode plugin that routes every prompt through Switchyard — across
+OpenRouter's live catalog (primary), with Codex subscription support when a
+`codex login` is present.
 
 ```bash
 npm i @vepando/switchyard-opencode
 ```
 
-`opencode.json` (a ready-made file is in [`examples/opencode.json`](https://github.com/LeonardSEO/switchyard/blob/main/examples/opencode.json)):
+## Setup
+
+Add the plugin and a Switchyard provider to `opencode.json` (a ready-made file
+is in [`examples/opencode.json`](https://github.com/LeonardSEO/switchyard/blob/main/examples/opencode.json)):
 
 ```json
 {
@@ -23,12 +27,24 @@ npm i @vepando/switchyard-opencode
 }
 ```
 
-Then pick model `switchyard/auto`. The plugin starts the gateway on first run and
-prints the snippet above.
+Then pick model `switchyard/auto`. The plugin starts the gateway on first run
+and prints the snippet above — no separate process to manage.
 
-Routing happens in the gateway: rungs, Pareto band, failure cost, with the chosen
-model on `x-switchyard-model` and `x-switchyard-complexity`.
+## How routing works
 
-## Docs
+Routing happens in the gateway: the objective is classified into a rung, then
+routed on price, benchmarks, measured quota and the cost of failure, with the
+Pareto frontier deciding inside the capable band. The chosen model comes back
+on the response:
 
-Full documentation: https://github.com/LeonardSEO/switchyard#readme
+```
+x-switchyard-model: inclusionai/ling-3.0-flash
+x-switchyard-complexity: trivial
+```
+
+Only the objective (the last user message, capped at 4000 characters) is used
+for classification; files, context and history never leave your machine.
+
+## License
+
+[Apache-2.0](https://github.com/LeonardSEO/switchyard/blob/main/LICENSE)

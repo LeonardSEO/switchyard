@@ -18,7 +18,7 @@
     "access": "public"
   },
   "name": "@vepando/switchyard-catalog",
-  "description": "Merges every model source into one candidate pool, with real subscription quota",
+  "description": "Merges OpenRouter, local models and Codex subscription capacity into one candidate pool, with real measured quota",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -38,9 +38,17 @@
   },
   "keywords": [
     "model-catalog",
+    "model-router",
+    "llm",
+    "ai",
     "openrouter",
     "codex",
-    "llm"
+    "chatgpt-subscription",
+    "ollama",
+    "lm-studio",
+    "local-llm",
+    "quota",
+    "cost-aware"
   ],
   "dependencies": {
     "@vepando/switchyard-core": "^0.1.0",

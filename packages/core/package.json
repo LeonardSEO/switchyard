@@ -18,7 +18,7 @@
     "access": "public"
   },
   "name": "@vepando/switchyard-core",
-  "description": "Pure routing core: classify, filter, score, decide. No I/O.",
+  "description": "Pure model-routing core: classify, filter, score, decide. Expected-cost routing with failure pricing, quota intelligence and Pareto banding. No I/O.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -38,9 +38,17 @@
   },
   "keywords": [
     "model-router",
-    "llm",
+    "llm-router",
+    "ai-router",
+    "model-routing",
     "router",
+    "llm",
+    "ai",
     "cost-aware",
-    "ai"
+    "cost-optimization",
+    "expected-cost",
+    "pareto",
+    "token-cost",
+    "typescript"
   ]
 }

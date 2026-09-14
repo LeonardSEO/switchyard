@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
-  "description": "Subscription-aware economic model router for coding agents",
+  "description": "Subscription-aware model router for coding agents: routes every turn to the cheapest capable model across OpenRouter and your Codex plan",
   "workspaces": [
     "packages/*"
   ],
@@ -25,11 +25,26 @@
     "vitest": "^5.0.0"
   },
   "keywords": [
-    "pi-package",
     "model-router",
+    "llm-router",
+    "ai-router",
+    "model-routing",
     "llm",
+    "ai",
+    "coding-agent",
+    "ai-coding",
+    "openrouter",
     "codex",
-    "openrouter"
+    "chatgpt-subscription",
+    "cost-optimization",
+    "cost-aware",
+    "token-cost",
+    "llm-gateway",
+    "openai-compatible",
+    "pi-package",
+    "opencode",
+    "developer-tools",
+    "typescript"
   ],
   "pi": {
     "extensions": [

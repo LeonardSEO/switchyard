@@ -18,7 +18,7 @@
     "access": "public"
   },
   "name": "@vepando/switchyard-provider-openrouter",
-  "description": "Live OpenRouter catalog: models, prices, capabilities and benchmark scores",
+  "description": "Live OpenRouter catalog source: models, prices, context windows, declared capabilities and benchmark scores, ETag-cached",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -39,7 +39,13 @@
   "keywords": [
     "openrouter",
     "model-catalog",
-    "llm"
+    "model-router",
+    "llm",
+    "ai",
+    "benchmarks",
+    "pricing",
+    "model-metadata",
+    "cost-aware"
   ],
   "dependencies": {
     "@vepando/switchyard-core": "^0.1.0"

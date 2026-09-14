@@ -4,8 +4,8 @@
 
 Every coding turn gets routed to the model that should actually take it — across
 OpenRouter's live catalog (500+ models) and, optionally, the Codex subscription
-you already pay for. It decides on price, published benchmarks, and the cost of
-getting it wrong. Not on a cost tier you have to pick yourself.
+you already pay for. The decision is made on price, published benchmarks, and
+the cost of getting it wrong. Not on a cost tier you have to pick yourself.
 
 ```
 "rename the variable total to orderTotal"                 → trivial   → cheap flash, effort minimal
@@ -167,4 +167,4 @@ supported today.
 
 ## License
 
-Apache-2.0
+[Apache-2.0](LICENSE)

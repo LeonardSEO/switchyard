@@ -4,7 +4,7 @@
   "license": "Apache-2.0",
   "type": "module",
   "author": "LeonardSEO",
-  "description": "OpenAI-compatible endpoint that routes each request to the right model",
+  "description": "OpenAI-compatible endpoint that routes each request to the right model: cheapest capable across OpenRouter and Codex subscription capacity",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -27,10 +27,26 @@
     "prepare": "npm run build"
   },
   "keywords": [
-    "model-router",
     "openai-compatible",
-    "gateway",
-    "llm"
+    "openai-api",
+    "llm-gateway",
+    "api-gateway",
+    "proxy",
+    "model-router",
+    "llm-router",
+    "ai-router",
+    "llm",
+    "ai",
+    "coding-agent",
+    "cursor",
+    "cline",
+    "aider",
+    "opencode",
+    "openrouter",
+    "codex",
+    "cost-optimization",
+    "cost-aware",
+    "developer-tools"
   ],
   "repository": {
     "type": "git",
