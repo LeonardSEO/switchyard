@@ -1,9 +1,16 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { existsSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapacityState, ModelCapabilities } from "@vepando/switchyard-core";
-import { createExtension, matchPiModel, judgeRun, readOutcomes, signalsFromOutcomes } from "../src/index";
+import {
+  buildProjectContext,
+  createExtension,
+  matchPiModel,
+  judgeRun,
+  readOutcomes,
+  signalsFromOutcomes,
+} from "../src/index";
 import type { PiApiLike, PiContextLike, PiModelLike } from "../src/pi";
 
 const model = (
@@ -111,14 +118,54 @@ function fakeCtxWithAuth(auth: { apiKey?: string; baseUrl?: string }) {
 }
 
 const files: string[] = [];
+const directories: string[] = [];
 const tempFile = () => {
   const path = join(tmpdir(), `switchyard-outcomes-${Math.random().toString(36).slice(2)}.jsonl`);
   files.push(path);
   return path;
 };
 
+const tempDirectory = () => {
+  const path = mkdtempSync(join(tmpdir(), "switchyard-project-"));
+  directories.push(path);
+  return path;
+};
+
 afterEach(() => {
   while (files.length) rmSync(files.pop()!, { force: true });
+  while (directories.length) rmSync(directories.pop()!, { force: true, recursive: true });
+});
+
+describe("project context", () => {
+  it("summarises structure, manifest and AGENTS.md when present", async () => {
+    const root = tempDirectory();
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, "src"));
+    writeFileSync(
+      join(root, "package.json"),
+      JSON.stringify({ name: "example", dependencies: { fastify: "1" }, scripts: { test: "vitest" } }),
+    );
+    writeFileSync(join(root, "AGENTS.md"), "Authentication spans middleware and the database.");
+    writeFileSync(join(root, "src", "auth.ts"), "export {};");
+
+    const context = await buildProjectContext(root);
+
+    expect(context).toContain("Project: ");
+    expect(context).toContain('"name": "example"');
+    expect(context).toContain("src/auth.ts");
+    expect(context).toContain("Authentication spans middleware");
+  });
+
+  it("works without AGENTS.md or a known manifest", async () => {
+    const root = tempDirectory();
+    writeFileSync(join(root, "main.txt"), "hello");
+
+    const context = await buildProjectContext(root);
+
+    expect(context).toContain("Project: ");
+    expect(context).toContain("main.txt");
+    expect(context).not.toContain("PROJECT INSTRUCTIONS");
+  });
 });
 
 describe("pi adapter", () => {
@@ -270,6 +317,8 @@ describe("classifier escalation", () => {
       { id: "deepseek/deepseek-v4-flash-0731", provider: "openrouter" },
     ];
     const { pi, handlers } = fakePi([]);
+    const project = tempDirectory();
+    mkdirSync(join(project, ".git"));
     // A large-tier option is what makes escalation worth paying for: without
     // one, getting the rung right saves nothing.
     const snapshot = snapshotOf([
@@ -309,7 +358,21 @@ describe("classifier escalation", () => {
         failureFile: tempFile(),
         quiet: true,
       })(pi);
-      await handlers.before_agent_start!({ prompt: uncertain }, ctx);
+      await handlers.before_agent_start!(
+        {
+          prompt: uncertain,
+          systemPromptOptions: {
+            cwd: project,
+            contextFiles: [
+              {
+                path: join(project, "AGENTS.md"),
+                content: "Authentication crosses multiple services and requires integration tests.",
+              },
+            ],
+          },
+        },
+        ctx,
+      );
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -318,6 +381,8 @@ describe("classifier escalation", () => {
     expect(captured.headers?.authorization).toBe("Bearer pi-key");
     expect(captured.url).toBe("https://example.test/v1/chat/completions");
     expect(captured.body).toContain("cheap/classifier");
+    expect(captured.body).toContain("Authentication crosses multiple services");
+    expect(captured.body).toContain("CURRENT TASK");
   });
 
   it("does not call a model when escalation is 'uncertain' and the keyword answer is confident", async () => {

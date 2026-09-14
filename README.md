@@ -17,6 +17,7 @@ One package supports [Pi](https://pi.dev), [OpenCode](https://opencode.ai), and 
 - **A live model pool.** OpenRouter models are evaluated from current catalog metadata instead of a fixed shortlist. That includes model families from OpenAI, Anthropic, Google, DeepSeek, xAI, Qwen, Mistral, Meta, and others as they are available through OpenRouter.
 - **Your Codex quota is a real resource.** Optional subscription capacity competes with API models based on remaining quota and time until reset; it is never treated as infinitely free.
 - **Failure has a price.** Routing considers token cost, benchmark evidence, observed outcomes, and the estimated cost of a failed attempt.
+- **Complexity is codebase-aware in Pi.** The classifier sees a compact project profile, so the same request can route differently in a small app and a cross-service monorepo.
 - **The agent stays in control.** Switchyard selects a model and reasoning level. Your coding agent keeps its tools, permissions, MCP servers, session, and authentication.
 
 ## Install
@@ -62,7 +63,7 @@ Use `http://127.0.0.1:8787/v1` as the OpenAI-compatible base URL and select `swi
 ## How routing works
 
 ```text
-objective -> classify -> filter -> score expected cost -> select model + effort
+request + compact project context -> classify -> filter -> score expected cost -> select model + effort
 ```
 
 | Level | Typical work | Reasoning effort |
@@ -106,6 +107,7 @@ All options are optional.
 | `escalation` | `always` (default), `uncertain`, or `never`; use `never` to keep classification local |
 | `classifierModel` | Pin the model used to classify tasks |
 | `reuseSimilarity` | Control when a previous task classification may be reused; default `0.6` |
+| `projectContext` | Pi: `auto` (default) or `none`; disable repository context while keeping model classification |
 | `failureCostByRisk` | Tune the penalty for an unsuccessful attempt at each risk level |
 | `preferPaidCapacityFactor` | Control how much worse subscription capacity may score and still win; default `2` |
 | `SWITCHYARD_PORT` | Gateway port; default `8787` |
@@ -113,7 +115,20 @@ All options are optional.
 
 ## Privacy and security
 
-For classification, Switchyard sends only the latest user objective, capped at 4,000 characters. It does not add repository files or prior history to that classification call. The selected execution provider still receives the conversation and tool data that your client sends for the actual completion.
+In Pi, classification sends the latest user objective (up to 4,000 characters)
+plus a compact project profile (up to 16,000 characters). The profile contains
+the repository name, a shallow file tree, safe manifest metadata such as package
+and script names, and project context files already loaded by Pi, such as
+`AGENTS.md` or `CLAUDE.md`. It does not send source-file contents or conversation
+history. Missing manifests or instruction files are simply omitted. Context
+files can contain private project information; review them before enabling a
+remote classifier, use `projectContext: "none"` to exclude them, or set
+`escalation: "never"` to keep all classification local.
+
+The OpenCode and standalone gateway integrations currently classify only the
+latest user objective, capped at 4,000 characters. The selected execution
+provider still receives the conversation and tool data that the client sends
+for the actual completion.
 
 Set `escalation: "never"` to disable model-based classification. Credentials remain in the host or environment and are not written into Switchyard configuration. Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 

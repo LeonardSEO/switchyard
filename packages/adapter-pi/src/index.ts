@@ -15,8 +15,14 @@ import {
 } from "@vepando/switchyard-core";
 import type { Snapshot } from "@vepando/switchyard-catalog";
 import { signalsFromCatalog } from "@vepando/switchyard-catalog";
-import type { PiApiLike, PiContextLike, PiModelLike } from "./pi.js";
+import type {
+  PiApiLike,
+  PiBeforeAgentStartEventLike,
+  PiContextLike,
+  PiModelLike,
+} from "./pi.js";
 import { matchPiModel } from "./pi.js";
+import { buildProjectContext } from "./project-context.js";
 import { createPiCompletion } from "./completion.js";
 import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes.js";
 import {
@@ -33,6 +39,7 @@ export * from "./pi.js";
 export * from "./outcomes.js";
 export * from "./store.js";
 export * from "./completion.js";
+export * from "./project-context.js";
 
 export interface AdapterOptions {
   /** Injectable for tests; defaults to the live snapshot builder. */
@@ -67,6 +74,8 @@ export interface AdapterOptions {
    * riding the same model. Set it lower to trade a little latency for accuracy.
    */
   reuseSimilarity?: number;
+  /** Include compact codebase context in classification. Default "auto". */
+  projectContext?: "auto" | "none";
 }
 
 /**
@@ -103,8 +112,10 @@ export function createExtension(opts: AdapterOptions = {}) {
     // reused while the objective is still recognisably the same task.
     let lastObjective: string | undefined;
     let lastClassification: Classification | undefined;
+    let lastProjectContext: string | undefined;
     let classifierPromise: Promise<Classifier> | undefined;
     let cacheWritePromise: Promise<void> = Promise.resolve();
+    const projectContextPromises = new Map<string, Promise<string>>();
 
     pi.registerCommand?.("switchyard-clear-cache", {
       description: "Clear cached Switchyard task classifications",
@@ -117,6 +128,8 @@ export function createExtension(opts: AdapterOptions = {}) {
           classifierPromise = undefined;
           lastObjective = undefined;
           lastClassification = undefined;
+          lastProjectContext = undefined;
+          projectContextPromises.clear();
           ctx.ui?.notify?.("Switchyard classification cache cleared.", "info");
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
@@ -208,9 +221,25 @@ export function createExtension(opts: AdapterOptions = {}) {
       return snapshotPromise;
     };
 
-    pi.on("before_agent_start", async (event: { prompt?: string }, ctx: PiContextLike) => {
+    pi.on("before_agent_start", async (event: PiBeforeAgentStartEventLike, ctx: PiContextLike) => {
       const objective = event?.prompt?.trim();
       if (!objective || objective.length < 3) return;
+
+      let projectContext = "";
+      if (opts.projectContext !== "none") {
+        const cwd = event.systemPromptOptions?.cwd ?? ctx.cwd ?? process.cwd();
+        const loadedContextFiles = event.systemPromptOptions?.contextFiles ?? [];
+        const contextFilesKey = loadedContextFiles
+          .map((file) => `${file.path ?? ""}:${file.content ?? ""}`)
+          .join("\u0000");
+        const projectContextKey = `${cwd}\u0000${contextFilesKey}`;
+        let projectContextPromise = projectContextPromises.get(projectContextKey);
+        if (!projectContextPromise) {
+          projectContextPromise = buildProjectContext(cwd, loadedContextFiles);
+          projectContextPromises.set(projectContextKey, projectContextPromise);
+        }
+        projectContext = await projectContextPromise.catch(() => "");
+      }
 
       let snapshot: Snapshot;
       try {
@@ -234,20 +263,27 @@ export function createExtension(opts: AdapterOptions = {}) {
       let classification: Classification;
       const threshold = opts.reuseSimilarity ?? DEFAULT_REUSE_SIMILARITY;
       const reuse =
-        lastClassification && lastObjective && taskSimilarity(lastObjective, objective) >= threshold;
+        lastClassification &&
+        lastObjective &&
+        lastProjectContext === projectContext &&
+        taskSimilarity(lastObjective, objective) >= threshold;
       if (reuse && lastClassification) {
         classification = { ...lastClassification, source: "model" };
       } else {
-        classification = await getClassifier(ctx, snapshot).then((c) => c.classify({ objective }));
+        classification = await getClassifier(ctx, snapshot).then((c) =>
+          c.classify({ objective, projectContext: projectContext || undefined }),
+        );
         // A provider/auth/HTTP failure degrades to the local classifier. That
         // keeps this turn working, but it must not become a reusable session
         // result; the persistent classifier cache already follows this rule.
         if (!classification.degraded) {
           lastObjective = objective;
           lastClassification = classification;
+          lastProjectContext = projectContext;
         } else {
           lastObjective = undefined;
           lastClassification = undefined;
+          lastProjectContext = undefined;
         }
       }
       const outcomes = await readOutcomes(opts.outcomeFile);

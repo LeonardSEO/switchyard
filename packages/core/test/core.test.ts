@@ -6,6 +6,7 @@ import {
   effectiveInputPer1M,
   filterCandidates,
   inferKind,
+  classifierInput,
   classificationCost,
   isUncertain,
   keywordClassification,
@@ -324,5 +325,24 @@ describe("classifier", () => {
     expect(first.source).toBe("model");
     expect(complete).toHaveBeenCalledTimes(1);
     expect(second).toEqual(first);
+  });
+
+  it("includes project context and isolates cached answers per codebase", async () => {
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce({ text: '{"complexity":"simple"}' })
+      .mockResolvedValueOnce({ text: '{"complexity":"complex"}' });
+    const c = new ModelClassifier({ models: [...models, mid, large], complete });
+    const small = { objective: "fix authentication", projectContext: "Small app, one auth file" };
+    const distributed = {
+      objective: "fix authentication",
+      projectContext: "Monorepo, custom OAuth and RBAC across eight services",
+    };
+
+    expect(classifierInput(small)).toContain("PROJECT CONTEXT");
+    expect(classifierInput(small)).toContain("CURRENT TASK:\nfix authentication");
+    expect((await c.classify(small)).complexity).toBe("simple");
+    expect((await c.classify(distributed)).complexity).toBe("complex");
+    expect(complete).toHaveBeenCalledTimes(2);
   });
 });

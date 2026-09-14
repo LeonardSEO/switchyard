@@ -2,7 +2,14 @@
 
 Notable changes to Switchyard are documented here.
 
-## 0.3.1 - unreleased
+## 0.3.2 - 2026-09-14
+
+### Added
+
+- Make Pi task classification codebase-aware with a compact repository profile built from project structure, safe manifest metadata, and Pi-loaded context files.
+- Keep classification cache entries isolated per project profile and fall back cleanly when `AGENTS.md`, `CLAUDE.md`, or a known manifest is absent.
+
+## 0.3.1 - 2026-09-14
 
 ### Fixed
 

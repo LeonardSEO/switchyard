@@ -43,6 +43,19 @@ export interface PiContextLike {
   ui?: { notify?(message: string, level?: string): void };
 }
 
+export interface PiContextFileLike {
+  path?: string;
+  content?: string;
+}
+
+export interface PiBeforeAgentStartEventLike {
+  prompt?: string;
+  systemPromptOptions?: {
+    cwd?: string;
+    contextFiles?: PiContextFileLike[];
+  };
+}
+
 export interface PiCommandLike {
   description?: string;
   handler(args: string, ctx: PiContextLike): Promise<void>;

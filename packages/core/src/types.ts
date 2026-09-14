@@ -156,6 +156,8 @@ export interface SessionContext {
 export interface TaskSpec {
   id?: string;
   objective: string;
+  /** Compact repository context used only for task classification. */
+  projectContext?: string;
   /** Omit to infer from the objective. */
   kind?: TaskKind;
   /** Omit to infer from the objective. */

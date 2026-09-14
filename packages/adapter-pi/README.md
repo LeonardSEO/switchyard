@@ -8,6 +8,11 @@
 
 Switchyard routes each coding task to a capable model without spending frontier-model prices on routine work. It evaluates OpenRouter's live catalog and optional Codex subscription capacity using capability, price, context, measured outcomes, quota, and the expected cost of failure.
 
+In Pi, the task classifier also receives a compact repository profile: project
+structure, safe package metadata, and available `AGENTS.md` or `CLAUDE.md`
+context. This lets the same request receive a different complexity rating in a
+small app than in a cross-service monorepo. Missing context files are optional.
+
 ## Install
 
 ### Pi
@@ -71,7 +76,15 @@ Set `OPENROUTER_API_KEY` or use credentials exposed by the host. When `codex log
 
 ## Privacy
 
-Classification sends only the latest user objective, capped at 4,000 characters. It does not add files or conversation history. The chosen execution provider still receives the messages and tool data sent by the client for the actual completion. Set `escalation: "never"` to keep classification local.
+Classification sends the latest user objective (up to 4,000 characters) and a
+compact project profile (up to 16,000 characters). The profile contains a
+shallow file tree, safe manifest metadata, and Pi-loaded project context such as
+`AGENTS.md`; it does not include source-file contents or conversation history.
+Because context files can contain private project information, review them
+before using a remote classifier. Set `projectContext: "none"` to classify only
+the objective, or `escalation: "never"` to keep classification local. The chosen
+execution provider still receives the messages and tool data sent by the client
+for the actual completion.
 
 ## Requirements and status
 
