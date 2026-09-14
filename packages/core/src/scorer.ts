@@ -12,12 +12,23 @@ export const CHEAP_FLOOR_PER_1M = 0.01;
  * gap between what a task demands and what a model can do — not the model's
  * absolute score. A weak model is perfectly reliable at a trivial rename.
  */
+/**
+ * Each rung's demand sets a ceiling (demand + band) and that ceiling selects
+ * the model class: whatever is cheapest at or above it. Calibrated so the rungs
+ * land on recognisable classes in the live catalog:
+ *
+ *   trivial/simple  -> cheapest capable (measured, ~$0.02/M)
+ *   moderate        -> flash class: deepseek v4 flash, glm 5.3 flash   (~$0.06)
+ *   advanced        -> pro class: glm 5.3, kimi k3, deepseek v4 pro    (~$0.75)
+ *   complex         -> top class: grok 4.6, gpt-5.6-sol, opus          (~$2)
+ *   frontier        -> frontier band: best available, Codex Astra when it lasts
+ */
 export const DEMAND_BY_COMPLEXITY: Record<string, number> = {
   trivial: 0.15,
   simple: 0.3,
   moderate: 0.5,
-  advanced: 0.58,
-  complex: 0.68,
+  advanced: 0.69,
+  complex: 0.72,
   frontier: 0.85,
 };
 
@@ -30,8 +41,8 @@ export const MIN_CAPABILITY_BY_COMPLEXITY: Record<string, number> = {
   trivial: 0,
   simple: 0.15,
   moderate: 0.35,
-  advanced: 0.5,
-  complex: 0.6,
+  advanced: 0.6,
+  complex: 0.68,
   frontier: 0.7,
 };
 
