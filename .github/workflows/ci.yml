@@ -18,7 +18,13 @@ jobs:
           node-version: 22
 
       - name: Install
-        run: npm ci
+        # --ignore-scripts: workspace prepare scripts build each package, and
+        # adapter-pi would run before its workspace deps have a dist/. Build
+        # explicitly in dependency order instead.
+        run: npm ci --ignore-scripts
+
+      - name: Build
+        run: npm run build
 
       - name: Typecheck
         run: npm run typecheck
