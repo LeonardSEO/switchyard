@@ -1,22 +1,25 @@
 # Switchyard
 
-**A subscription-aware model router for coding agents.**
+### Route every coding task to the model that is capable enough — without paying frontier prices for routine work.
 
-Every coding turn gets routed to the model that should actually take it — across
-OpenRouter's live catalog (500+ models) and, optionally, the Codex subscription
-you already pay for. The decision is made on price, published benchmarks, and
-the cost of getting it wrong. Not on a cost tier you have to pick yourself.
+[![npm version](https://img.shields.io/npm/v/@vepando/switchyard?logo=npm&color=cb3837)](https://www.npmjs.com/package/@vepando/switchyard)
+[![CI](https://github.com/LeonardSEO/switchyard/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonardSEO/switchyard/actions/workflows/ci.yml)
+[![Node.js 20+](https://img.shields.io/badge/node-%3E%3D20-339933?logo=node.js&logoColor=white)](package.json)
+[![Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
 
-```
-"rename the variable total to orderTotal"                 → trivial   → cheap flash, effort minimal
-"add pagination to the orders API"                        → moderate  → large flash
-"rewrite the billing service as an event-driven system"   → frontier  → top tier, or your Codex quota
-```
+Switchyard is a subscription-aware model router for coding agents. It combines OpenRouter's live catalog with optional Codex subscription capacity, classifies the task, filters out unsuitable models, and minimizes the expected cost of getting a correct result.
+
+One package supports [Pi](https://pi.dev), [OpenCode](https://opencode.ai), and any client that can use an OpenAI-compatible endpoint.
+
+## Why Switchyard
+
+- **Six routing levels, not three hard-coded models.** Tasks range from `trivial` to `frontier`, each with its own capability floor and reasoning effort.
+- **A live model pool.** OpenRouter models are evaluated from current catalog metadata instead of a fixed shortlist. That includes model families from OpenAI, Anthropic, Google, DeepSeek, xAI, Qwen, Mistral, Meta, and others as they are available through OpenRouter.
+- **Your Codex quota is a real resource.** Optional subscription capacity competes with API models based on remaining quota and time until reset; it is never treated as infinitely free.
+- **Failure has a price.** Routing considers token cost, benchmark evidence, observed outcomes, and the estimated cost of a failed attempt.
+- **The agent stays in control.** Switchyard selects a model and reasoning level. Your coding agent keeps its tools, permissions, MCP servers, session, and authentication.
 
 ## Install
-
-Switchyard runs as a [Pi](https://pi.dev) package, an OpenCode plugin, or a local
-endpoint for anything else.
 
 ### Pi
 
@@ -24,146 +27,117 @@ endpoint for anything else.
 pi install npm:@vepando/switchyard
 ```
 
-Pi keeps its own permissions, tools, MCP, sessions and authentication. Switchyard
-only answers two questions per turn: which model, and how hard it should think.
+That is enough. The npm keyword `pi-package` makes the package eligible for the Pi package gallery as its index refreshes.
 
 ### OpenCode
 
 ```bash
-npm i @vepando/switchyard-opencode
+npm install @vepando/switchyard
 ```
 
-Then, in `opencode.json` (a ready-made file is in [`examples/opencode.json`](examples/opencode.json)):
+Add the plugin and provider to `opencode.json`:
 
 ```json
 {
-  "plugin": ["@vepando/switchyard-opencode"],
+  "plugin": ["@vepando/switchyard"],
   "provider": {
     "switchyard": {
       "npm": "@ai-sdk/openai-compatible",
       "name": "Switchyard",
       "options": { "baseURL": "http://127.0.0.1:8787/v1" },
-      "models": { "auto": { "name": "Switchyard auto" } }
+      "models": { "auto": { "name": "Switchyard Auto" } }
     }
   }
 }
 ```
 
-Pick model `switchyard/auto`. The plugin starts the gateway for you.
+Choose `switchyard/auto`. The plugin starts the local gateway when needed.
 
-### Any other tool (Cursor, Cline, aider, curl)
+### Cursor, Cline, aider, curl, and other clients
 
 ```bash
-OPENROUTER_API_KEY=... npx @vepando/switchyard-gateway   # http://127.0.0.1:8787/v1
+OPENROUTER_API_KEY=... npx @vepando/switchyard
 ```
 
-Point your tool at that URL with model `switchyard/auto`.
+Use `http://127.0.0.1:8787/v1` as the OpenAI-compatible base URL and select `switchyard/auto`.
+
+## How routing works
+
+```text
+objective -> classify -> filter -> score expected cost -> select model + effort
+```
+
+| Level | Typical work | Reasoning effort |
+|---|---|---|
+| `trivial` | rename, typo, version bump | `minimal` |
+| `simple` | focused change in one file | `low` |
+| `moderate` | contained bug or multi-file feature | `medium` |
+| `advanced` | new subsystem or cross-cutting refactor | `high` |
+| `complex` | concurrency, migration, cross-service debugging | `xhigh` |
+| `frontier` | greenfield architecture or core rewrite | `max` |
+
+The scorer minimizes:
+
+```text
+expected cost = token cost + probability of failure x cost of failure
+```
+
+The selected model can therefore change as prices, capabilities, measured reliability, latency, context requirements, or subscription capacity change. Batch-only endpoints are excluded from interactive work. Tool-bearing gateway requests use API models until the Codex execution path can preserve the complete tool protocol safely.
 
 ## OpenRouter first, Codex optional
 
-**Switchyard is built around OpenRouter.** That is where the catalog, the prices
-and the benchmark scores come from, and where most routing decisions are made.
-You need an OpenRouter API key (or an OpenRouter login your harness already has).
+OpenRouter supplies the primary model catalog, pricing, and execution path. Set `OPENROUTER_API_KEY`, or use credentials already available through the host integration.
 
-Codex subscription support is **optional** and works in both the Pi adapter and
-the gateway: if you are logged into ChatGPT via `codex login`, Switchyard reads
-your real quota and treats Luna/Terra/Sol/Astra as candidates alongside the API
-catalog. Execution then happens on the Codex backend with that same login — no
-new keys. Without the login, nothing changes: everything routes over OpenRouter.
+If `codex login` is available, Switchyard can also consider supported Codex subscription models. Capacity that would otherwise expire is priced favorably; scarce capacity becomes expensive, and the final 10% is reserved. If subscription execution fails, Switchyard reroutes to a valid API model rather than forwarding an internal Codex identifier to OpenRouter.
 
-Subscription capacity is priced, never assumed free:
-
-| quota state | what it costs the router |
-|---|---|
-| will expire unused | nearly free — spend it |
-| on pace | full amortized price |
-| nearly drained | expensive — held back, with the last 10% reserved |
-
-## How a turn is routed
-
-1. **Objective** — the last user message (nothing else leaves your machine).
-2. **Classify** into one of six rungs, with a cheap model by default.
-3. **Filter** — capability floor, tier, context, tools, quota; batch endpoints are
-   excluded from interactive work.
-4. **Score** — expected cost = token cost + probability of failure × cost of failure.
-5. **Pick** — the cheapest model inside the capable band.
-
-| rung | example | reasoning effort |
-|---|---|---|
-| trivial | rename, typo, bump a version | minimal |
-| simple | small change in one file | low |
-| moderate | multi-file feature, contained bug | medium |
-| advanced | new subsystem, cross-cutting refactor | high |
-| complex | concurrency, migration, cross-service debugging | xhigh |
-| frontier | greenfield architecture, core rewrite | max |
-
-Failure is priced because a botched rewrite costs an afternoon while tokens cost
-cents. That single choice is why a full rewrite goes to the frontier and a rename
-does not.
-
-## Accuracy
-
-| | fitting set | held-out set |
-|---|---|---|
-| keyword rules | 9/10 | **2/12** |
-| model classification | 7/10 | **11/12** |
-
-The 9/10 was overfitting; on tasks the rules were never tuned for they collapse.
-So classification uses a cheap model by default: one call per *task* (not per
-turn), cached on disk, with the deterministic answer as offline fallback.
-
-## OpenRouter attribution
-
-OpenRouter ranks apps and agents by attributed traffic — there is no submission
-form. Switchyard therefore sends these on every request it makes, under any harness:
+Every OpenRouter request includes app attribution:
 
 ```http
 HTTP-Referer: https://github.com/LeonardSEO/switchyard
 X-Title: Switchyard
 ```
 
-Forking this? Set `SWITCHYARD_APP_TITLE` and `SWITCHYARD_APP_URL` so your traffic
-ranks under your own name.
+Forks can override these values with `SWITCHYARD_APP_URL` and `SWITCHYARD_APP_TITLE`.
 
 ## Configuration
 
-Everything is optional.
+All options are optional.
 
-- `escalation: "never"` — no classification calls; every objective stays local.
-- `classifierModel: "<id>"` — pin the classifier instead of letting price,
-  benchmark and measured latency decide.
-- `failureCostByRisk` — what a failed attempt costs you, per risk level.
-- `preferPaidCapacityFactor` — how much worse subscription capacity may be and
-  still win (default 2×).
-
-## Packages
-
-| package | role |
+| Option | Purpose |
 |---|---|
-| [`@vepando/switchyard`](packages/adapter-pi) | the Pi package |
-| [`@vepando/switchyard-opencode`](packages/opencode) | OpenCode plugin |
-| [`@vepando/switchyard-gateway`](packages/gateway) | OpenAI-compatible endpoint for any tool |
-| [`@vepando/switchyard-core`](packages/core) | pure routing core |
-| [`@vepando/switchyard-catalog`](packages/catalog) | merged model pool, real quota |
-| [`@vepando/switchyard-provider-openrouter`](packages/provider-openrouter) | live OpenRouter catalog |
+| `escalation` | `always` (default), `uncertain`, or `never`; use `never` to keep classification local |
+| `classifierModel` | Pin the model used to classify tasks |
+| `reuseSimilarity` | Control when a previous task classification may be reused; default `0.6` |
+| `failureCostByRisk` | Tune the penalty for an unsuccessful attempt at each risk level |
+| `preferPaidCapacityFactor` | Control how much worse subscription capacity may score and still win; default `2` |
+| `SWITCHYARD_PORT` | Gateway port; default `8787` |
+| `SWITCHYARD_ESCALATION` | Gateway equivalent of the `escalation` option |
 
-## Privacy
+## Privacy and security
 
-Classification sends **only the objective** — your prompt text, capped at 4000
-characters. Never your files, repository context, or history. Run `escalation:
-"never"` to keep everything local.
+For classification, Switchyard sends only the latest user objective, capped at 4,000 characters. It does not add repository files or prior history to that classification call. The selected execution provider still receives the conversation and tool data that your client sends for the actual completion.
 
-## Requirements
+Set `escalation: "never"` to disable model-based classification. Credentials remain in the host or environment and are not written into Switchyard configuration. Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-Node 20+. An OpenRouter key. Optionally `codex login` for subscription capacity
-in Pi.
+## Package architecture
 
-## Status
+Users install only `@vepando/switchyard`. The repository remains a workspace internally so the routing core, catalog, providers, gateway, and adapters can be tested independently; the release build bundles those modules into the single public package.
 
-Early. The eval corpus is small (10 fitting + 12 held-out), so accuracy figures
-are indicative. The Codex execution path uses an undocumented backend: it falls
-back to API routing if that backend ever changes. Only Pi and OpenCode are
-supported today.
+## Project status
+
+Switchyard is early-stage software. The held-out classifier evaluation is promising but still small, and the optional Codex execution path relies on an undocumented backend. The gateway falls back to API routing when that backend is unavailable. Treat routing decisions as an optimization aid, not a guarantee of model quality or availability.
+
+## Development
+
+```bash
+npm ci
+npm run typecheck
+npm test
+npm run build
+npm run pack:check
+```
+
+Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 

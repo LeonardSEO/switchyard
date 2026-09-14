@@ -1,5 +1,5 @@
 {
-  "version": "0.1.4",
+  "version": "0.3.0",
   "license": "Apache-2.0",
   "type": "module",
   "author": "LeonardSEO",
@@ -18,22 +18,33 @@
     "access": "public"
   },
   "name": "@vepando/switchyard",
-  "description": "Route every Pi turn to the right model: cheapest capable across OpenRouter's catalog and the Codex subscription you already pay for",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "description": "Subscription-aware model routing for Pi, OpenCode and every OpenAI-compatible coding agent",
+  "main": "./dist/opencode.js",
   "exports": {
     ".": {
+      "default": "./dist/opencode.js"
+    },
+    "./pi": {
       "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
+      "default": "./dist/pi.js"
+    },
+    "./opencode": {
+      "default": "./dist/opencode.js"
+    },
+    "./gateway": {
+      "default": "./dist/gateway.js"
     },
     "./extension": {
       "default": "./extensions/switchyard.js"
     }
   },
+  "bin": {
+    "switchyard-gateway": "./bin/switchyard-gateway.js"
+  },
   "files": [
     "dist",
-    "src",
     "extensions",
+    "bin",
     "README.md"
   ],
   "scripts": {
@@ -61,9 +72,5 @@
     "extensions": [
       "./extensions"
     ]
-  },
-  "dependencies": {
-    "@vepando/switchyard-catalog": "^0.1.0",
-    "@vepando/switchyard-core": "^0.1.0"
   }
 }

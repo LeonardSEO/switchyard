@@ -12,7 +12,7 @@ import { signalsFromCatalog, stats } from "@vepando/switchyard-catalog";
 import { buildSnapshot } from "./build-catalog";
 
 const force = process.argv.includes("--force");
-const snapshot = await buildSnapshot(force);
+const snapshot = await buildSnapshot({ force });
 
 console.log("=== sources ===");
 for (const s of snapshot.status) {

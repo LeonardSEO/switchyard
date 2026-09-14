@@ -18,6 +18,7 @@
     "access": "public"
   },
   "name": "@vepando/switchyard-catalog",
+  "private": true,
   "description": "Merges OpenRouter, local models and Codex subscription capacity into one candidate pool, with real measured quota",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

@@ -18,6 +18,7 @@
     "access": "public"
   },
   "name": "@vepando/switchyard-core",
+  "private": true,
   "description": "Pure model-routing core: classify, filter, score, decide. Expected-cost routing with failure pricing, quota intelligence and Pareto banding. No I/O.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

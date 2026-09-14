@@ -250,7 +250,7 @@ export function scoreCandidate(
   const estCost = scale(estimateCostUsd(m, task, cap, signal, cfg), premium);
   // History beats benchmarks, benchmarks beat nothing. Capability above what
   // the task demands is capped: it is noise, not value.
-  const raw = signal?.successRate ? signal.successRate : m.capabilityScore;
+  const raw = signal?.successRate ?? m.capabilityScore;
   const ceiling = Math.min(demand + OVERQUALIFICATION_BAND, qualityCap ?? Number.POSITIVE_INFINITY);
   // Unmeasured gets the assumed level and the same ceiling. Returning
   // "undefined" here would silently skip the ceiling and hand unmeasured models

@@ -50,7 +50,7 @@ const check = (ok: boolean, label: string, detail: string) => {
 };
 
 /** Quality floor implied by task complexity. Mirrors the tier filter. */
-const FLOOR: Record<Complexity, number> = { simple: 0, moderate: 0.35, complex: 0.6 };
+const FLOOR: Partial<Record<Complexity, number>> = { simple: 0, moderate: 0.35, complex: 0.6 };
 
 interface Case {
   label: string;
@@ -116,7 +116,7 @@ for (const c of cases) {
 
   const floor = FLOOR[cls.complexity];
   const cap = chosen.capabilityScore;
-  if (floor > 0) {
+  if (floor !== undefined && floor > 0) {
     check(
       cap !== undefined && cap >= floor,
       `capability >= ${floor}`,
@@ -141,7 +141,7 @@ for (const c of cases) {
   // near-equal options rather than chasing the exact argmin.
   check(
     bestExpected === undefined ||
-      (chosenExpected?.known && chosenExpected.value <= bestExpected * 1.05 + 1e-9),
+      (chosenExpected?.known === true && chosenExpected.value <= bestExpected * 1.05 + 1e-9),
     "within 5% of best expected cost",
     `$${(chosenExpected?.known ? chosenExpected.value : 0).toFixed(3)} vs best $${bestExpected?.toFixed(3) ?? "?"}`,
   );

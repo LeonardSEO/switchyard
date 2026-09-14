@@ -29,6 +29,11 @@ export interface CodexResult {
   model: string;
 }
 
+export interface CodexChatRequest {
+  messages?: Array<{ role?: string; content?: unknown }>;
+  max_tokens?: number;
+}
+
 const DEFAULT_ENDPOINT = "https://chatgpt.com/backend-api/codex/responses";
 
 export function defaultAuthPath(home = process.env.HOME ?? "."): string {
@@ -60,6 +65,14 @@ export async function executeCodex(
   model: ModelCapabilities,
   opts: CodexExecOptions = {},
 ): Promise<CodexResult> {
+  return executeCodexRequest({ messages }, model, opts);
+}
+
+export async function executeCodexRequest(
+  request: CodexChatRequest,
+  model: ModelCapabilities,
+  opts: CodexExecOptions = {},
+): Promise<CodexResult> {
   const auth = await (opts.readAuth ?? readCodexAuth)(opts.authPath ?? defaultAuthPath());
   if (!auth.accessToken) throw new Error("no codex login");
 
@@ -73,7 +86,9 @@ export async function executeCodex(
     },
     body: JSON.stringify({
       model: codexModelId(model),
-      input: toCodexInput(messages),
+      instructions: toCodexInstructions(request.messages ?? []),
+      input: toCodexInput(request.messages ?? []),
+      ...(request.max_tokens === undefined ? {} : { max_output_tokens: request.max_tokens }),
       stream: true,
       store: false,
     }),
@@ -83,6 +98,15 @@ export async function executeCodex(
     throw new Error(`codex backend ${res.status}: ${detail.slice(0, 120)}`);
   }
   return { text: await collectText(res.body), model: codexModelId(model) };
+}
+
+function toCodexInstructions(messages: Array<{ role?: string; content?: unknown }>): string | undefined {
+  const instructions = messages
+    .filter((m) => m?.role === "system" || m?.role === "developer")
+    .map((m) => flatten(m.content))
+    .filter(Boolean)
+    .join("\n\n");
+  return instructions || undefined;
 }
 
 /** Aggregate an SSE stream into plain text. */

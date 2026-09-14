@@ -6,6 +6,7 @@ import {
   readCodexUsage,
 } from "../src/codex-usage";
 import { defaultCodexModels, matchCapability, resolveRoster } from "../src/index";
+import { executeCodexRequest } from "../src/codex-exec";
 import type { ModelCapabilities } from "@vepando/switchyard-core";
 
 const auth = {
@@ -133,5 +134,46 @@ describe("codex roster resolution", () => {
   it("rewrites the roster with resolved scores", () => {
     const { specs } = resolveRoster(defaultCodexModels, catalog);
     expect(specs.find((s) => s.id === "codex-luna")?.declaredCapability).toBeCloseTo(0.714);
+  });
+});
+
+describe("codex execution request", () => {
+  it("preserves instructions and output limits", async () => {
+    let sent: Record<string, unknown> | undefined;
+    await executeCodexRequest(
+      {
+        messages: [
+          { role: "system", content: "System rules" },
+          { role: "developer", content: "Repository rules" },
+          { role: "user", content: "Do the work" },
+        ],
+        max_tokens: 321,
+      },
+      {
+        id: "codex-sol",
+        provider: "codex-subscription",
+        tier: "large",
+        pricing: {
+          kind: "subscription",
+          inputPer1M: { known: false },
+          outputPer1M: { known: false },
+          planAmortizedPer1M: { known: true, value: 0.5 },
+        },
+      },
+      {
+        readAuth: async () => ({ accessToken: "token" }),
+        fetchFn: (async (_url: unknown, init: { body?: string }) => {
+          sent = JSON.parse(init.body ?? "{}") as Record<string, unknown>;
+          return {
+            ok: true,
+            body: new ReadableStream({ start(controller) { controller.close(); } }),
+          } as Response;
+        }) as typeof fetch,
+      },
+    );
+
+    expect(sent?.instructions).toBe("System rules\n\nRepository rules");
+    expect(sent?.max_output_tokens).toBe(321);
+    expect(JSON.stringify(sent?.input)).toContain("Do the work");
   });
 });

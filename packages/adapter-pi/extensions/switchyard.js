@@ -1,2 +1,2 @@
-// Pi package entry point: re-export the compiled extension.
-export { default } from "../dist/index.js";
+// Pi package entry point. The published package is self-contained.
+export { default } from "../dist/pi.js";

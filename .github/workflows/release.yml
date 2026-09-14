@@ -1,29 +1,49 @@
 name: Release
 
-# Publishes every package whose version in package.json is not yet on npm.
-# One tag per release: `git tag v0.1.7 && git push --tags`.
+# Publishing a GitHub release is the single release action. The tag and npm
+# package version must match, preventing older version tags from being created
+# on newer commits.
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
+
+concurrency:
+  group: release-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      id-token: write
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
         with:
-          node-version: 22
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
           registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Verify release version
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          root_version=$(node -p "require('./package.json').version")
+          package_version=$(node -p "require('./packages/adapter-pi/package.json').version")
+          test "$root_version" = "$package_version" || {
+            echo "Root version $root_version does not match public package $package_version"
+            exit 1
+          }
+          test "$RELEASE_TAG" = "v$package_version" || {
+            echo "Release tag $RELEASE_TAG does not match @vepando/switchyard@$package_version"
+            exit 1
+          }
 
       - name: Install
-        # --ignore-scripts: workspace prepare scripts build each package, and
-        # adapter-pi would run before its workspace deps have a dist/. Build
-        # explicitly in dependency order instead.
         run: npm ci --ignore-scripts
 
       - name: Build
@@ -33,19 +53,10 @@ jobs:
         run: npm run typecheck
 
       - name: Test
-        run: npx vitest run
+        run: npm test
 
-      - name: Publish packages whose version is new
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          for pkg in core catalog provider-openrouter adapter-pi gateway opencode; do
-            name=$(node -p "require('./packages/$pkg/package.json').name")
-            version=$(node -p "require('./packages/$pkg/package.json').version")
-            if npm view "$name@$version" version > /dev/null 2>&1; then
-              echo "skip $name@$version (already published)"
-            else
-              echo "publishing $name@$version"
-              npm publish --workspace "packages/$pkg" --access public
-            fi
-          done
+      - name: Verify package contents
+        run: npm run pack:check
+
+      - name: Publish @vepando/switchyard
+        run: npm publish --workspace packages/adapter-pi --access public --provenance

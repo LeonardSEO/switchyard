@@ -14,9 +14,15 @@ import {
   type CapacityState,
   type ModelCapabilities,
 } from "@vepando/switchyard-core";
-import { buildSnapshot, executeCodex } from "@vepando/switchyard-catalog";
+import { buildSnapshot, executeCodexRequest } from "@vepando/switchyard-catalog";
 import { createOpenRouterCompletion } from "@vepando/switchyard-provider-openrouter";
-import { extractObjective, modelList, rewriteRequest, type ChatRequest } from "./router.js";
+import {
+  extractObjective,
+  modelList,
+  requiresApiExecution,
+  rewriteRequest,
+  type ChatRequest,
+} from "./router.js";
 
 export interface GatewayOptions {
   port?: number;
@@ -37,6 +43,7 @@ export interface GatewayOptions {
   executeSubscription?: (
     messages: Array<{ role?: string; content?: unknown }>,
     model: ModelCapabilities,
+    request?: ChatRequest,
   ) => Promise<{ text: string }>;
 }
 
@@ -148,7 +155,10 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
       await refresh();
       const objective = extractObjective(body.messages) || "coding task";
       const classification = await classify(objective);
-      const decision = route({ objective }, models, classification, { capacity });
+      const candidates = requiresApiExecution(body)
+        ? models.filter((model) => model.pricing.kind === "api")
+        : models;
+      let decision = route({ objective }, candidates, classification, { capacity });
 
       if (!decision.model) {
         res.writeHead(503, { "content-type": "application/json" });
@@ -160,45 +170,45 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
         return;
       }
 
+      if (url.searchParams.has("explain") || body.model === "switchyard/explain") {
+        sendExplanation(res, decision, classification);
+        return;
+      }
+
       // Subscription capacity runs on the Codex backend, not upstream.
       if (decision.model.pricing.kind === "subscription") {
-        const run = opts.executeSubscription ?? executeCodex;
+        const run =
+          opts.executeSubscription ??
+          ((_messages, model, request) =>
+            executeCodexRequest(request ?? { messages: _messages }, model));
         try {
-          const result = await run(body.messages ?? [], decision.model);
+          const result = await run(body.messages ?? [], decision.model, body);
           const payload = completion(body, decision.model, result.text);
           res.writeHead(200, {
             "content-type": body.stream ? "text/event-stream" : "application/json",
             "x-switchyard-model": decision.model.id,
             "x-switchyard-complexity": decision.complexity,
           });
-          res.end(
-            body.stream
-              ? `data: ${JSON.stringify({ ...payload, object: "chat.completion.chunk" })}\n\ndata: [DONE]\n\n`
-              : JSON.stringify(payload),
-          );
+          res.end(body.stream ? streamCompletion(payload, result.text) : JSON.stringify(payload));
           return;
         } catch (err) {
           // Fail over to API routing rather than break the turn.
           console.warn(`[switchyard] codex execution failed: ${(err as Error).message}`);
+          decision = route(
+            { objective, skipModels: [decision.model.id] },
+            models.filter((model) => model.pricing.kind === "api"),
+            classification,
+            { capacity },
+          );
+          if (!decision.model) {
+            res.writeHead(503, { "content-type": "application/json" });
+            res.end(JSON.stringify({ error: { message: "switchyard: Codex failed and no API fallback is available" } }));
+            return;
+          }
         }
       }
 
       const { body: forwarded } = rewriteRequest(body, decision.model);
-
-      if (url.searchParams.has("explain") || body.model === "switchyard/explain") {
-        res.writeHead(200, { "content-type": "application/json" });
-        res.end(
-          JSON.stringify({
-            model: decision.model.id,
-            complexity: decision.complexity,
-            kind: decision.kind,
-            effort: decision.effort,
-            classifier: classification.source,
-            candidates: decision.ranked.length,
-          }),
-        );
-        return;
-      }
 
       const upstreamRes = await fetch(`${upstream}/chat/completions`, {
         method: "POST",
@@ -256,12 +266,48 @@ function completion(
     id: `chatcmpl-switchyard-${Date.now()}`,
     object: "chat.completion",
     created: Math.floor(Date.now() / 1000),
-    model: body.model ?? model.id,
+    model: model.id,
     choices: [
       { index: 0, message: { role: "assistant", content: text }, finish_reason: "stop" },
     ],
     usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
   };
+}
+
+function sendExplanation(
+  res: ServerResponse,
+  decision: ReturnType<typeof route>,
+  classification: Classification,
+): void {
+  res.writeHead(200, { "content-type": "application/json" });
+  res.end(
+    JSON.stringify({
+      model: decision.model?.id ?? null,
+      complexity: decision.complexity,
+      kind: decision.kind,
+      effort: decision.effort,
+      classifier: classification.source,
+      candidates: decision.ranked.length,
+    }),
+  );
+}
+
+function streamCompletion(payload: ReturnType<typeof completion>, text: string): string {
+  const base = {
+    id: payload.id,
+    object: "chat.completion.chunk",
+    created: payload.created,
+    model: payload.model,
+  };
+  const content = {
+    ...base,
+    choices: [{ index: 0, delta: { role: "assistant", content: text }, finish_reason: null }],
+  };
+  const finished = {
+    ...base,
+    choices: [{ index: 0, delta: {}, finish_reason: "stop" }],
+  };
+  return `data: ${JSON.stringify(content)}\n\ndata: ${JSON.stringify(finished)}\n\ndata: [DONE]\n\n`;
 }
 
 async function readBody(req: IncomingMessage): Promise<string> {

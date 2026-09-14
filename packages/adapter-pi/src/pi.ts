@@ -72,10 +72,20 @@ export function matchPiModel(model: ModelCapabilities, available: PiModelLike[])
   if (!token) return undefined;
   return available.find((p) => {
     const name = normalise(p.name ?? p.id);
-    return name === token || name.endsWith(`-${token}`) || name.endsWith(`/${token}`);
+    if (name === token) return true;
+    if (model.provider !== "codex-subscription") return false;
+    return tokens(p.name ?? p.id).includes(token);
   });
 }
 
 function normalise(value: string): string {
   return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function tokens(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split(/[^a-z0-9]+/)
+    .map(normalise)
+    .filter(Boolean);
 }

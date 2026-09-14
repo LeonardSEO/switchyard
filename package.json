@@ -1,6 +1,6 @@
 {
   "name": "switchyard",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "license": "Apache-2.0",
@@ -16,10 +16,12 @@
     "typecheck": "tsc --noEmit",
     "eval:classifier": "tsx scripts/classifier-eval.ts",
     "outcomes": "tsx scripts/outcomes.ts",
-    "build": "for p in core provider-openrouter catalog gateway adapter-pi opencode; do tsc -p packages/$p/tsconfig.build.json || exit 1; done"
+    "build": "for p in core provider-openrouter catalog gateway adapter-pi opencode; do tsc -p packages/$p/tsconfig.build.json || exit 1; done && tsx scripts/bundle.ts",
+    "pack:check": "npm pack --workspace packages/adapter-pi --dry-run"
   },
   "devDependencies": {
     "@types/node": "^26.5.1",
+    "esbuild": "^0.28.2",
     "tsx": "^4.23.13",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"
@@ -41,14 +43,8 @@
     "token-cost",
     "llm-gateway",
     "openai-compatible",
-    "pi-package",
     "opencode",
     "developer-tools",
     "typescript"
-  ],
-  "pi": {
-    "extensions": [
-      "./extensions"
-    ]
-  }
+  ]
 }

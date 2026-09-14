@@ -9,7 +9,15 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "noEmit": true,
+    "paths": {
+      "@vepando/switchyard-core": ["./packages/core/src/index.ts"],
+      "@vepando/switchyard-provider-openrouter": ["./packages/provider-openrouter/src/index.ts"],
+      "@vepando/switchyard-catalog": ["./packages/catalog/src/index.ts"],
+      "@vepando/switchyard-gateway": ["./packages/gateway/src/index.ts"],
+      "@vepando/switchyard-opencode": ["./packages/opencode/src/index.ts"],
+      "@vepando/switchyard": ["./packages/adapter-pi/src/index.ts"]
+    },
     "types": ["node"]
   },
-  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "eval/**/*.ts"]
+  "include": ["packages/*/src/**/*.ts", "packages/*/test/**/*.ts", "eval/**/*.ts", "scripts/**/*.ts"]
 }

@@ -18,6 +18,7 @@
     "access": "public"
   },
   "name": "@vepando/switchyard-provider-openrouter",
+  "private": true,
   "description": "Live OpenRouter catalog source: models, prices, context windows, declared capabilities and benchmark scores, ETag-cached",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

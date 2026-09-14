@@ -192,6 +192,20 @@ describe("scoring", () => {
     expect(d.model?.id).toBe("measured-mid");
   });
 
+  it("treats a measured zero success rate as evidence", () => {
+    const task = { objective: "debug the worker", kind: "debug" as const, failureCostUsd: 10 };
+    const capable = { ...large, capabilityScore: 0.8 };
+    const failed = scoreCandidate(
+      task,
+      task.kind,
+      capable,
+      undefined,
+      { successRate: 0, rejectRate: 0 },
+      defaultQuotaConfig,
+    );
+    expect(failed.pFail).toBeGreaterThan(0.9);
+  });
+
   it("prefers paid-for capacity on complex work but not on trivial work", () => {
     const cash = { ...api("cash-large", "large", 0.15, 0.75), capabilityScore: 0.72 };
     const sub = subscription("codex-sol", "large", 0.5, 0.774);

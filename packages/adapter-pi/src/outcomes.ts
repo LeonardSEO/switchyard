@@ -84,13 +84,15 @@ export function signalsFromOutcomes(outcomes: Outcome[]): Record<string, Routing
  */
 export function judgeRun(messages: unknown[]): boolean {
   if (!Array.isArray(messages) || messages.length === 0) return false;
+  let hasAssistantMessage = false;
   for (const message of messages) {
     const m = message as { role?: string; stopReason?: string; errorMessage?: string };
     if (m.role !== "assistant") continue;
+    hasAssistantMessage = true;
     if (m.errorMessage) return false;
     if (m.stopReason === "error" || m.stopReason === "aborted" || m.stopReason === "length") {
       return false;
     }
   }
-  return true;
+  return hasAssistantMessage;
 }

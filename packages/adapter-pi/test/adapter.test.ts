@@ -124,6 +124,11 @@ describe("pi adapter", () => {
   it("matches our catalog ids and Codex names onto Pi's registry", () => {
     expect(matchPiModel(flash, available)?.id).toBe("deepseek/deepseek-v4-flash-0731");
     expect(matchPiModel(sol, available)?.id).toBe("gpt-5.6-sol");
+    expect(
+      matchPiModel(sol, [
+        { id: "gpt-5.6-sol", provider: "openai-codex", name: "GPT-5.6 Sol" },
+      ])?.id,
+    ).toBe("gpt-5.6-sol");
     expect(matchPiModel(model("nope/nope", "nope", "api", 1, 0.5), available)).toBeUndefined();
   });
 
@@ -225,6 +230,7 @@ describe("pi adapter", () => {
     expect(judgeRun([{ role: "assistant", stopReason: "error" }])).toBe(false);
     expect(judgeRun([{ role: "assistant", stopReason: "length" }])).toBe(false);
     expect(judgeRun([{ role: "assistant", stopReason: "stop" }])).toBe(true);
+    expect(judgeRun([{ role: "user", content: "never answered" }])).toBe(false);
     expect(judgeRun([])).toBe(false);
   });
 });

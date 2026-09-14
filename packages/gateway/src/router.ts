@@ -12,6 +12,34 @@ import type { ModelCapabilities } from "@vepando/switchyard-core";
 export interface ChatMessage {
   role?: string;
   content?: unknown;
+  tool_calls?: unknown;
+  [key: string]: unknown;
+}
+
+/** Codex subscription execution currently supports text conversations only. */
+export function requiresApiExecution(body: ChatRequest): boolean {
+  const supportedFields = new Set(["model", "messages", "stream", "max_tokens"]);
+  if (Object.keys(body).some((field) => !supportedFields.has(field))) return true;
+  if (Array.isArray(body.tools) && body.tools.length > 0) return true;
+  return (body.messages ?? []).some(
+    (message) =>
+      !["system", "developer", "user", "assistant"].includes(message.role ?? "") ||
+      message.tool_calls !== undefined ||
+      !isTextContent(message.content),
+  );
+}
+
+function isTextContent(content: unknown): boolean {
+  if (typeof content === "string") return true;
+  if (!Array.isArray(content)) return content === null || content === undefined;
+  return content.every(
+    (part) =>
+      typeof part === "string" ||
+      (typeof part === "object" &&
+        part !== null &&
+        ["text", "input_text", "output_text"].includes(String((part as { type?: unknown }).type)) &&
+        typeof (part as { text?: unknown }).text === "string"),
+  );
 }
 
 export interface ChatRequest {

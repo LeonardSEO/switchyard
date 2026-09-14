@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { createServer, type Server } from "node:http";
 import type { ModelCapabilities } from "@vepando/switchyard-core";
 import { createGateway } from "../src/index.js";
-import { extractObjective, modelList, rewriteRequest } from "../src/index.js";
+import { extractObjective, modelList, requiresApiExecution, rewriteRequest } from "../src/index.js";
 
 const model = (id: string, price: number, capability: number): ModelCapabilities => ({
   id,
@@ -49,6 +49,27 @@ describe("gateway routing helpers", () => {
     const list = modelList(pool);
     expect(list.data[0].id).toBe("switchyard/auto");
     expect(list.data).toHaveLength(pool.length + 1);
+  });
+
+  it("keeps tool-bearing requests on an API execution path", () => {
+    expect(
+      requiresApiExecution({
+        messages: [{ role: "user", content: "run a tool" }],
+        tools: [{ type: "function", function: { name: "shell" } }],
+      }),
+    ).toBe(true);
+    expect(
+      requiresApiExecution({
+        messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "x" } }] }],
+      }),
+    ).toBe(true);
+    expect(
+      requiresApiExecution({
+        messages: [{ role: "user", content: "structured" }],
+        response_format: { type: "json_object" },
+      }),
+    ).toBe(true);
+    expect(requiresApiExecution({ messages: [{ role: "system", content: "rules" }] })).toBe(false);
   });
 });
 
@@ -203,7 +224,11 @@ describe("subscription capacity in the gateway", () => {
   });
 
   it("fails over to API routing when the Codex backend errors", async () => {
-    const echo = createServer((_req, res) => {
+    const forwardedModels: string[] = [];
+    const echo = createServer((req, res) => {
+      let raw = "";
+      req.on("data", (chunk) => (raw += chunk));
+      req.on("end", () => forwardedModels.push((JSON.parse(raw) as { model: string }).model));
       res.writeHead(200, { "content-type": "application/json" });
       res.end(JSON.stringify({ choices: [{ message: { content: "from upstream" } }] }));
     });
@@ -244,5 +269,88 @@ describe("subscription capacity in the gateway", () => {
     const json = (await res.json()) as { choices: Array<{ message: { content: string } }> };
     expect(res.status).toBe(200);
     expect(json.choices[0].message.content).toBe("from upstream");
+    expect(forwardedModels).toHaveLength(1);
+    expect(forwardedModels[0]).not.toBe("codex-sol");
+    expect(res.headers.get("x-switchyard-model")).toBe(forwardedModels[0]);
+  });
+
+  it("explains a subscription decision without executing it", async () => {
+    let executions = 0;
+    const sol: ModelCapabilities = {
+      ...model("codex-sol", 0.5, 0.8),
+      provider: "codex-subscription",
+      pricing: {
+        kind: "subscription",
+        inputPer1M: { known: false },
+        outputPer1M: { known: false },
+        planAmortizedPer1M: { known: true, value: 0.5 },
+      },
+    };
+    gateway = await createGateway({
+      models: [...pool, sol],
+      capacity: {
+        "codex-sol": {
+          available: true,
+          usage: { remainingFraction: 0.9, windowElapsedFraction: 0.1, source: "test" },
+        },
+      },
+      executeSubscription: async () => {
+        executions += 1;
+        return { text: "should not run" };
+      },
+    });
+
+    const res = await fetch(`http://127.0.0.1:${gateway.port}/v1/chat/completions?explain=1`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "switchyard/auto",
+        messages: [{ role: "user", content: "Rewrite the billing service from scratch as a scalable event-driven system" }],
+      }),
+    });
+    const json = (await res.json()) as { model: string };
+    expect(json.model).toBe("codex-sol");
+    expect(executions).toBe(0);
+  });
+
+  it("returns valid OpenAI streaming chunks for subscription text", async () => {
+    const sol: ModelCapabilities = {
+      ...model("codex-sol", 0.5, 0.8),
+      provider: "codex-subscription",
+      pricing: {
+        kind: "subscription",
+        inputPer1M: { known: false },
+        outputPer1M: { known: false },
+        planAmortizedPer1M: { known: true, value: 0.5 },
+      },
+    };
+    gateway = await createGateway({
+      models: [...pool, sol],
+      capacity: {
+        "codex-sol": {
+          available: true,
+          usage: { remainingFraction: 0.9, windowElapsedFraction: 0.1, source: "test" },
+        },
+      },
+      executeSubscription: async () => ({ text: "streamed" }),
+    });
+
+    const text = await fetch(`http://127.0.0.1:${gateway.port}/v1/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "switchyard/auto",
+        stream: true,
+        messages: [{ role: "user", content: "Rewrite the billing service from scratch as a scalable event-driven system" }],
+      }),
+    }).then((response) => response.text());
+
+    const events = text
+      .split("\n\n")
+      .filter((line) => line.startsWith("data: {") )
+      .map((line) => JSON.parse(line.slice(6)) as { choices: Array<{ delta: { content?: string } }> });
+    expect(events[0].choices[0].delta.content).toBe("streamed");
+    expect(text).not.toContain('"message"');
+    expect(text).toContain("data: [DONE]");
   });
 });
