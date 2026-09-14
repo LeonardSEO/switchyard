@@ -155,6 +155,9 @@ remaining misses are upwards ("add a retry" classified moderate instead of
 simple) — the safe direction, and arguably correct: the corpus records cheap
 models failing on exactly those tasks.
 
+Pin the classifier with `classifierModel: "inclusionai/ling-3.0-flash"` if you
+want it fixed; otherwise price, benchmark and measured latency decide.
+
 So the adapter classifies with a model by default (`escalation: "always"`),
 cached and budgeted at $0.001 per call, with the keyword answer as the offline
 and failure fallback. `escalation: "never"` keeps every objective local.

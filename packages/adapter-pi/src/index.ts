@@ -43,6 +43,12 @@ export interface AdapterOptions {
   latencyFile?: string;
   /** Failed-classifier file; defaults to ~/.switchyard/classifier-failures.json */
   failureFile?: string;
+  /**
+   * Pin the classifier model by id. Leave unset to let price, benchmark and
+   * measured latency decide; set it when you have a model you trust and do not
+   * want selection moving away from it.
+   */
+  classifierModel?: string;
   /** Tell the user what was chosen. Off in tests. */
   quiet?: boolean;
   /**
@@ -105,7 +111,12 @@ export function createExtension(opts: AdapterOptions = {}) {
             latencyMs: (m) => latencies[m.id],
             avoid: (m) => failed[m.id] !== undefined,
           });
-          if (!picked) return new KeywordClassifier();
+          // An explicitly pinned model wins over price and latency.
+          const pinned = opts.classifierModel
+            ? candidates.find((m) => m.id === opts.classifierModel)
+            : undefined;
+          const chosen = pinned ?? picked;
+          if (!chosen) return new KeywordClassifier();
           const backups = rankClassifierCandidates(
             candidates,
             {
@@ -131,8 +142,8 @@ export function createExtension(opts: AdapterOptions = {}) {
           return new ModelClassifier({
             models: candidates,
             cache: diskCache as never,
-            complete: timedCompletion(ctx, picked, opts.latencyFile, backups, opts.failureFile),
-            modelId: picked.id,
+            complete: timedCompletion(ctx, chosen, opts.latencyFile, pinned ? [] : backups, opts.failureFile),
+            modelId: chosen.id,
             // Measured on a held-out set: keyword 2/12, model 11/12. The rung
             // decides every other decision, so it is worth one round trip —
             // cached on disk, latency-tracked, and degrading to the keyword

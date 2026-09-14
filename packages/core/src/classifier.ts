@@ -133,7 +133,10 @@ export const defaultClassifierFloors: ClassifierFloors = {
   allowReasoning: false,
   requireBenchmark: true,
   minCapabilityScore: 0.2,
-  maxLatencyMs: 800,
+  // A ~2s classification is acceptable; churn is not. A tighter budget makes the
+  // selection flip between models every few turns, and each flip is paid for
+  // with a slow call to an unmeasured one.
+  maxLatencyMs: 2000,
   preferLocal: true,
 };
 

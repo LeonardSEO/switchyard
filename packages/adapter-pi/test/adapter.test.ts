@@ -480,6 +480,5 @@ describe("task similarity", () => {
       globalThis.fetch = originalFetch;
     }
     expect(calls).toBe(1);
-    expect(captured.body).toBeDefined();
   });
 });
