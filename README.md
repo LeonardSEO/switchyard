@@ -106,7 +106,42 @@ npm run bench
 The cold/warm gap is the argument for both history and the escalation
 classifier. Do not ship a router that only has cold-start behaviour.
 
+## Pi adapter
+
+`@switchyard/adapter-pi` runs the router inside [pi](https://pi.dev). It does not
+become the coding agent: pi keeps its permissions, tools, MCP, sessions and
+authentication. The adapter only answers two questions per turn — which model,
+and how hard it should think — then records what happened.
+
+```
+before_agent_start  -> classify the prompt, route, pi.setModel() + pi.setThinkingLevel()
+agent_end           -> append the outcome to ~/.switchyard/outcomes.jsonl
+```
+
+Outcomes become per-`(model, kind)` success rates, which is what closes the gap
+between cold-start routing (6/10 on the corpus) and routing on evidence (6/6).
+
+Try it without touching your pi config:
+
+```bash
+pi -p "rename the variable total to orderTotal" \
+  -e ~/Developer/switchyard/packages/adapter-pi/src/index.ts \
+  --no-tools --no-session
+```
+
+Install it for real by adding the path to `~/.pi/agent/settings.json`:
+
+```json
+{ "extensions": ["/Users/leonard/Developer/switchyard/packages/adapter-pi/src/index.ts"] }
+```
+
+Two models are only ever chosen if pi can actually run them: the catalog is
+intersected with `ctx.modelRegistry.getAvailable()`, so a model pi has no
+credentials for is never selected. Codex subscription models are matched by name
+against pi's Codex provider, and are skipped when that login is absent.
+
 ## Next
+
 
 1. `@switchyard/provider-openrouter` — dynamic catalog, prices, capacity.
 2. `@switchyard/adapter-pi` — `pi.registerProvider` + `before_provider_request`,
