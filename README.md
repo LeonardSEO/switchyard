@@ -37,6 +37,8 @@ opencode plugin @vepando/switchyard
 
 Restart OpenCode and choose `switchyard/auto`. The plugin starts the local gateway and registers the provider automatically.
 
+Upgrading an existing installation? Run `opencode plugin @vepando/switchyard@latest --force` once so OpenCode refreshes its package cache.
+
 For a manual project configuration, add only the plugin:
 
 ```json
