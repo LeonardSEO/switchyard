@@ -26,6 +26,10 @@ const MEDIUM = [
   "production-grade",
   "distributed",
   "migration",
+  "migrate",
+  "migrating",
+  "sharding",
+  "without downtime",
 ];
 const LOW = ["e2e", "pipeline", "service", "deploy", "integrate", "infra", "implement"];
 /** Words that mark a task as mechanical: no design decision, one place. */

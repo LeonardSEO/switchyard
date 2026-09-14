@@ -1,0 +1,12 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "plugin": ["@vepando/switchyard-opencode"],
+  "provider": {
+    "switchyard": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Switchyard",
+      "options": { "baseURL": "http://127.0.0.1:8787/v1" },
+      "models": { "auto": { "name": "Switchyard auto" } }
+    }
+  }
+}

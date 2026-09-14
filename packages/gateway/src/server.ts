@@ -3,6 +3,7 @@ import { Readable } from "node:stream";
 import {
   defaultClassifierFloors,
   keywordClassification,
+  rankClassifierCandidates,
   ModelClassifier,
   pickCheapestClassifier,
   route,
@@ -67,15 +68,36 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
     loadedAt = now();
 
     const api = models.filter((m) => m.pricing.kind === "api");
-    const picked = pickCheapestClassifier(api, {
+    const floors = {
       ...defaultClassifierFloors,
+      // Below ~0.5 models guess instead of following the schema, and the rung
+      // decides everything downstream.
+      minCapabilityScore: 0.5,
       allowReasoning: true,
-    });
+    };
+    const ranked = rankClassifierCandidates(api, floors, 3);
+    const picked = ranked[0];
+    const transport = createOpenRouterCompletion({ apiKey: opts.apiKey });
+    // Fall through to the next candidate on failure: one dead catalog entry
+    // must not cost every request its classification.
+    const complete = ranked.length > 1
+      ? async (req: Parameters<typeof transport>[0]) => {
+          let lastError: unknown;
+          for (const candidate of ranked) {
+            try {
+              return await transport({ ...req, model: candidate });
+            } catch (err) {
+              lastError = err;
+            }
+          }
+          throw lastError instanceof Error ? lastError : new Error("classifier unavailable");
+        }
+      : transport;
     classifier = picked
       ? new ModelClassifier({
           models: api,
           modelId: picked.id,
-          complete: createOpenRouterCompletion({ apiKey: opts.apiKey }),
+          complete,
           escalation: opts.escalation ?? "always",
           minSavingsFactor: 0,
         })
