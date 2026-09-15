@@ -1,6 +1,6 @@
 # Switchyard
 
-### One subscription-aware model router for Pi, OpenCode, and OpenAI-compatible coding agents.
+### One subscription-aware model router for Pi, Oh My Pi, OpenCode, and OpenAI-compatible coding agents.
 
 [![npm version](https://img.shields.io/npm/v/@vepando/switchyard?logo=npm&color=cb3837)](https://www.npmjs.com/package/@vepando/switchyard)
 [![CI](https://github.com/LeonardSEO/switchyard/actions/workflows/ci.yml/badge.svg)](https://github.com/LeonardSEO/switchyard/actions/workflows/ci.yml)
@@ -24,6 +24,18 @@ pi install npm:@vepando/switchyard
 Run `/switchyard-clear-cache` in Pi whenever you want to remove saved task
 classifications. The next matching task will be classified again; model choices
 are never stored in this cache.
+
+### Oh My Pi (OMP)
+
+```bash
+omp plugin install @vepando/switchyard
+```
+
+Restart OMP or run `/reload-plugins`. OMP's built-in `auto` thinking mode
+selects reasoning effort for the current model. Switchyard additionally selects
+the model using capability, price, context, measured outcomes, and optional
+Codex capacity. It reuses OMP's available OpenRouter credentials and compatible
+model entries; it does not yet route every provider supported by OMP.
 
 ### OpenCode
 

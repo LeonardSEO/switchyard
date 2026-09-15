@@ -1,5 +1,5 @@
 {
-  "version": "0.3.2",
+  "version": "0.3.3",
   "license": "Apache-2.0",
   "type": "module",
   "author": "LeonardSEO",
@@ -54,6 +54,8 @@
     "pi-package",
     "pi",
     "pi-extension",
+    "omp",
+    "oh-my-pi",
     "model-router",
     "llm-router",
     "ai-router",
@@ -69,6 +71,11 @@
     "developer-tools"
   ],
   "pi": {
+    "extensions": [
+      "./extensions"
+    ]
+  },
+  "omp": {
     "extensions": [
       "./extensions"
     ]

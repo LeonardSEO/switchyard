@@ -2,6 +2,13 @@
 
 Notable changes to Switchyard are documented here.
 
+## 0.3.3 - 2026-09-15
+
+### Added
+
+- Add native Oh My Pi plugin discovery alongside the existing Pi extension manifest.
+- Document OMP installation and clarify how Switchyard model routing complements OMP's built-in automatic reasoning-effort selection.
+
 ## 0.3.2 - 2026-09-14
 
 ### Added

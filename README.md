@@ -9,7 +9,7 @@
 
 Switchyard is a subscription-aware model router for coding agents. It combines OpenRouter's live catalog with optional Codex subscription capacity, classifies the task, filters out unsuitable models, and minimizes the expected cost of getting a correct result.
 
-One package supports [Pi](https://pi.dev), [OpenCode](https://opencode.ai), and any client that can use an OpenAI-compatible endpoint.
+One package supports [Pi](https://pi.dev), [Oh My Pi](https://omp.sh), [OpenCode](https://opencode.ai), and any client that can use an OpenAI-compatible endpoint.
 
 ## Why Switchyard
 
@@ -33,6 +33,19 @@ That is enough. The npm keyword `pi-package` makes the package eligible for the 
 Run `/switchyard-clear-cache` in Pi whenever you want to remove saved task
 classifications. The next matching task will be classified again; model choices
 are never stored in this cache.
+
+### Oh My Pi (OMP)
+
+```bash
+omp plugin install @vepando/switchyard
+```
+
+Restart OMP or run `/reload-plugins`. OMP's built-in `auto` thinking mode
+selects reasoning effort for the current model; Switchyard additionally selects
+the model using capability, price, context, measured outcomes, and optional
+Codex capacity. Switchyard reuses OMP's available OpenRouter credentials and
+compatible model entries; it does not yet route every provider supported by
+OMP and does not replace its tools, sessions, or agent loop.
 
 ### OpenCode
 
@@ -115,11 +128,11 @@ All options are optional.
 
 ## Privacy and security
 
-In Pi, classification sends the latest user objective (up to 4,000 characters)
+In Pi and OMP, classification sends the latest user objective (up to 4,000 characters)
 plus a compact project profile (up to 16,000 characters). The profile contains
 the repository name, a shallow file tree, safe manifest metadata such as package
-and script names, and project context files already loaded by Pi, such as
-`AGENTS.md` or `CLAUDE.md`. It does not send source-file contents or conversation
+and script names, and project context files available to the host or discovered
+locally, such as `AGENTS.md` or `CLAUDE.md`. It does not send source-file contents or conversation
 history. Missing manifests or instruction files are simply omitted. Context
 files can contain private project information; review them before enabling a
 remote classifier, use `projectContext: "none"` to exclude them, or set
