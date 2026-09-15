@@ -54,6 +54,16 @@ Codex capacity. Switchyard reuses OMP's available OpenRouter credentials and
 compatible model entries; it does not yet route every provider supported by
 OMP and does not replace its tools, sessions, or agent loop.
 
+By default, Switchyard keeps routing every turn as before. To let OMP roles own
+their pinned models and opt only selected work into Switchyard, start OMP with:
+
+```bash
+SWITCHYARD_ROUTING_SCOPE=selected-model omp
+```
+
+Then assign `switchyard/auto` to the worker roles that should be economically
+routed. Planner, reviewer, prewalk, and other pinned roles remain untouched.
+
 ### OpenCode
 
 ```bash
@@ -129,10 +139,18 @@ All options are optional.
 | `classifierModel` | Pin the model used to classify tasks |
 | `reuseSimilarity` | Control when a previous task classification may be reused; default `0.6` |
 | `projectContext` | Pi: `auto` (default) or `none`; disable repository context while keeping model classification |
+| `snapshotFreshnessMs` | Pi/OMP catalog and Codex-capacity refresh interval; default 10 minutes |
+| `routingScope` | Pi/OMP: `global` (default) or `selected-model`; the latter routes only `switchyard/auto` |
 | `failureCostByRisk` | Tune the penalty for an unsuccessful attempt at each risk level |
 | `preferPaidCapacityFactor` | Control how much worse subscription capacity may score and still win; default `2` |
 | `SWITCHYARD_PORT` | Gateway port; default `8787` |
 | `SWITCHYARD_ESCALATION` | Gateway equivalent of the `escalation` option |
+| `SWITCHYARD_ROUTING_SCOPE` | Pi/OMP equivalent of `routingScope`; set `selected-model` for opt-in routing |
+
+Pi and OMP record ordinary agent-loop completion as telemetry, not as proof that
+the code is correct. Use `/switchyard-mark-success` after verification passes or
+`/switchyard-mark-failure` after a rejected/failed result. Only explicit failures
+and verified successes update learned model success rates.
 
 ## Privacy and security
 

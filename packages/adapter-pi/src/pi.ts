@@ -39,6 +39,8 @@ export interface ProviderAuthResultLike {
 
 export interface PiContextLike {
   modelRegistry: PiModelRegistryLike;
+  /** Current model. OMP and recent Pi releases expose this to extensions. */
+  model?: PiModelLike;
   cwd?: string;
   ui?: { notify?(message: string, level?: string): void };
 }
@@ -68,6 +70,22 @@ export interface PiApiLike {
   setThinkingLevel(level: string): void | Promise<void>;
   getThinkingLevel?(): string;
   registerCommand?(name: string, command: PiCommandLike): void;
+  registerProvider?(name: string, config: PiProviderConfigLike): void;
+}
+
+export interface PiProviderConfigLike {
+  baseUrl: string;
+  apiKey: string;
+  api: "openai-completions";
+  models: Array<{
+    id: string;
+    name: string;
+    reasoning: boolean;
+    input: Array<"text" | "image">;
+    cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
+    contextWindow: number;
+    maxTokens: number;
+  }>;
 }
 
 /**

@@ -134,8 +134,9 @@ export interface ModelCapabilities {
 
 /** Historical outcome signal, mirroring veto's RoutingSignal. */
 export interface RoutingSignal {
-  successRate: number;
-  rejectRate: number;
+  /** Omit until at least one real or explicitly verified outcome exists. */
+  successRate?: number;
+  rejectRate?: number;
   /** Omit when no evals have been recorded. */
   evalScore?: number;
   avgInputTokens?: number;

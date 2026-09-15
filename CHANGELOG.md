@@ -2,6 +2,19 @@
 
 Notable changes to Switchyard are documented here.
 
+## 0.3.5 - 2026-09-15
+
+### Fixed
+
+- Keep benchmark priors distinct from measured zero-percent success history.
+- Refresh Pi/OMP catalog and Codex-capacity snapshots every ten minutes.
+- Learn model quality only from explicit failures and verified outcomes.
+
+### Added
+
+- Add opt-in Pi/OMP routing through `switchyard/auto` with `routingScope: "selected-model"`.
+- Add commands to mark the last routed run as verified successful or failed.
+
 ## 0.3.4 - 2026-09-15
 
 ### Fixed

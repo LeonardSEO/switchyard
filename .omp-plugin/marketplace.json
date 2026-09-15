@@ -13,7 +13,7 @@
       "name": "switchyard",
       "description": "Route each OMP task to a capable, cost-effective model using live pricing, reliability, context, and optional Codex capacity",
       "source": "./packages/adapter-pi",
-      "version": "0.3.4",
+      "version": "0.3.5",
       "author": {
         "name": "LeonardSEO"
       },

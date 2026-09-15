@@ -13,6 +13,7 @@ import {
   type ModelCapabilities,
   type RoutingSignal,
 } from "@vepando/switchyard-core";
+import { randomUUID } from "node:crypto";
 import type { Snapshot } from "@vepando/switchyard-catalog";
 import { signalsFromCatalog } from "@vepando/switchyard-catalog";
 import type {
@@ -24,7 +25,14 @@ import type {
 import { matchPiModel } from "./pi.js";
 import { buildProjectContext } from "./project-context.js";
 import { createPiCompletion } from "./completion.js";
-import { appendOutcome, judgeRun, outcomesPath, readOutcomes, signalsFromOutcomes } from "./outcomes.js";
+import {
+  appendOutcome,
+  judgeRunStatus,
+  outcomesPath,
+  readOutcomes,
+  signalsFromOutcomes,
+  type OutcomeStatus,
+} from "./outcomes.js";
 import {
   clearClassificationCache,
   loadCache,
@@ -76,6 +84,12 @@ export interface AdapterOptions {
   reuseSimilarity?: number;
   /** Include compact codebase context in classification. Default "auto". */
   projectContext?: "auto" | "none";
+  /** Refresh catalog and Codex capacity during long-running sessions. Default 10 minutes. */
+  snapshotFreshnessMs?: number;
+  /** Injectable clock for deterministic freshness tests. */
+  now?: () => number;
+  /** Route every turn, or only turns started through `switchyard/auto`. */
+  routingScope?: "global" | "selected-model";
 }
 
 /**
@@ -85,8 +99,10 @@ export interface AdapterOptions {
  * 0.6 still recognizes "still working on the same thing" without stretching it.
  */
 export const DEFAULT_REUSE_SIMILARITY = 0.6;
+export const DEFAULT_SNAPSHOT_FRESHNESS_MS = 10 * 60 * 1000;
 
 interface PendingRun {
+  runId: string;
   modelId: string;
   kind: string;
   complexity: string;
@@ -105,8 +121,17 @@ interface PendingRun {
 export function createExtension(opts: AdapterOptions = {}) {
   return (pi: PiApiLike): void => {
     let snapshotPromise: Promise<Snapshot> | undefined;
+    let snapshotLoadedAt = 0;
     let availableCache: PiModelLike[] = [];
     let pending: PendingRun | undefined;
+    let lastRun: PendingRun | undefined;
+    let lastMarkedStatus: OutcomeStatus | undefined;
+    let selectedRoutingActive = false;
+    let applyingDecision = false;
+    let selectedAutoModel: PiModelLike | undefined;
+    let agentRunning = false;
+    let latestEvent: PiBeforeAgentStartEventLike | undefined;
+    let latestContext: PiContextLike | undefined;
     // Most sessions spend many turns on one task. Classifying the same task
     // again every turn is the latency users actually feel, so the rung is
     // reused while the objective is still recognisably the same task.
@@ -116,6 +141,32 @@ export function createExtension(opts: AdapterOptions = {}) {
     let classifierPromise: Promise<Classifier> | undefined;
     let cacheWritePromise: Promise<void> = Promise.resolve();
     const projectContextPromises = new Map<string, Promise<string>>();
+    const now = opts.now ?? Date.now;
+    const freshnessMs = opts.snapshotFreshnessMs ?? DEFAULT_SNAPSHOT_FRESHNESS_MS;
+    const routingScope =
+      opts.routingScope ??
+      (process.env.SWITCHYARD_ROUTING_SCOPE === "selected-model" ? "selected-model" : "global");
+
+    if (routingScope === "selected-model") {
+      pi.registerProvider?.("switchyard", {
+        // `switchyard/auto` is a control model. before_agent_start replaces it
+        // with the routed target before a provider request is made.
+        baseUrl: "http://127.0.0.1:8787/v1",
+        apiKey: "switchyard-control-model",
+        api: "openai-completions",
+        models: [
+          {
+            id: "auto",
+            name: "Switchyard Auto",
+            reasoning: true,
+            input: ["text", "image"],
+            cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+            contextWindow: 1_000_000,
+            maxTokens: 100_000,
+          },
+        ],
+      });
+    }
 
     pi.registerCommand?.("switchyard-clear-cache", {
       description: "Clear cached Switchyard task classifications",
@@ -137,6 +188,48 @@ export function createExtension(opts: AdapterOptions = {}) {
         }
       },
     });
+
+    const registerOutcomeCommand = (
+      name: string,
+      description: string,
+      status: Extract<OutcomeStatus, "verified_success" | "failed">,
+    ) => {
+      pi.registerCommand?.(name, {
+        description,
+        handler: async (_args, ctx) => {
+          if (!lastRun) {
+            ctx.ui?.notify?.("Switchyard has no completed run to mark.", "error");
+            return;
+          }
+          if (lastMarkedStatus === status) {
+            ctx.ui?.notify?.("That Switchyard outcome is already recorded.", "info");
+            return;
+          }
+          await appendOutcome(
+            { ...lastRun, status, at: now() },
+            opts.outcomeFile ?? outcomesPath(),
+          );
+          lastMarkedStatus = status;
+          ctx.ui?.notify?.(
+            status === "verified_success"
+              ? "Switchyard recorded the last run as verified successful."
+              : "Switchyard recorded the last run as failed.",
+            "info",
+          );
+        },
+      });
+    };
+
+    registerOutcomeCommand(
+      "switchyard-mark-success",
+      "Mark the last Switchyard run as verified successful",
+      "verified_success",
+    );
+    registerOutcomeCommand(
+      "switchyard-mark-failure",
+      "Mark the last Switchyard run as failed",
+      "failed",
+    );
 
     /**
      * The classifier escalates to a cheap model only when the deterministic
@@ -213,17 +306,35 @@ export function createExtension(opts: AdapterOptions = {}) {
     };
 
     const load = (): Promise<Snapshot> => {
-      if (!snapshotPromise) {
-        snapshotPromise = opts.loadSnapshot
+      if (!snapshotPromise || now() - snapshotLoadedAt >= freshnessMs) {
+        snapshotLoadedAt = now();
+        snapshotPromise = (opts.loadSnapshot
           ? opts.loadSnapshot()
-          : import("@vepando/switchyard-catalog").then((m) => m.buildSnapshot());
+          : import("@vepando/switchyard-catalog").then((m) => m.buildSnapshot()))
+          .catch((error) => {
+            snapshotPromise = undefined;
+            snapshotLoadedAt = 0;
+            throw error;
+          });
       }
       return snapshotPromise;
     };
 
-    pi.on("before_agent_start", async (event: PiBeforeAgentStartEventLike, ctx: PiContextLike) => {
+    const routeTurn = async (
+      event: PiBeforeAgentStartEventLike,
+      ctx: PiContextLike,
+      bypassScope = false,
+    ) => {
       const objective = event?.prompt?.trim();
       if (!objective || objective.length < 3) return;
+
+      if (routingScope === "selected-model" && !bypassScope) {
+        if (isSwitchyardAuto(ctx.model)) {
+          selectedRoutingActive = true;
+          selectedAutoModel = ctx.model;
+        }
+        if (!selectedRoutingActive) return;
+      }
 
       let projectContext = "";
       if (opts.projectContext !== "none") {
@@ -299,6 +410,7 @@ export function createExtension(opts: AdapterOptions = {}) {
       if (!target) return;
 
       pending = {
+        runId: randomUUID(),
         modelId: decision.modelId,
         kind: decision.kind,
         complexity: decision.complexity,
@@ -312,6 +424,7 @@ export function createExtension(opts: AdapterOptions = {}) {
       };
 
       try {
+        applyingDecision = true;
         await pi.setThinkingLevel(decision.effort);
         const ok = await pi.setModel(target);
         if (!ok) {
@@ -321,6 +434,8 @@ export function createExtension(opts: AdapterOptions = {}) {
       } catch {
         pending = undefined;
         return;
+      } finally {
+        applyingDecision = false;
       }
 
       if (!opts.quiet) {
@@ -331,26 +446,59 @@ export function createExtension(opts: AdapterOptions = {}) {
           "info",
         );
       }
+    };
+
+    pi.on("before_agent_start", async (event: PiBeforeAgentStartEventLike, ctx: PiContextLike) => {
+      latestEvent = event;
+      latestContext = ctx;
+      await routeTurn(event, ctx);
+    });
+
+    pi.on("agent_start", () => {
+      agentRunning = true;
+    });
+
+    pi.on("model_select", async (event: { model?: PiModelLike }) => {
+      if (routingScope !== "selected-model" || applyingDecision) return;
+      selectedRoutingActive = isSwitchyardAuto(event.model);
+      selectedAutoModel = selectedRoutingActive ? event.model : undefined;
+      // OMP prewalk can hand off after the agent has already started. Route
+      // that handoff immediately so the control model is never sent upstream.
+      if (selectedRoutingActive && agentRunning && latestEvent && latestContext) {
+        await routeTurn(latestEvent, latestContext, true);
+      }
     });
 
     pi.on("agent_end", async (event: { messages?: unknown[] }) => {
+      agentRunning = false;
       if (!pending) return;
       const run = pending;
       pending = undefined;
+      lastRun = run;
+      lastMarkedStatus = undefined;
       await appendOutcome(
         {
-          modelId: run.modelId,
-          kind: run.kind,
-          complexity: run.complexity,
-          effort: run.effort,
-          classifier: run.classifier,
-          success: judgeRun(event?.messages ?? []),
-          at: Date.now(),
+          ...run,
+          status: judgeRunStatus(event?.messages ?? []),
+          at: now(),
         },
         opts.outcomeFile ?? outcomesPath(),
       );
+
+      if (routingScope === "selected-model" && selectedRoutingActive && selectedAutoModel) {
+        try {
+          applyingDecision = true;
+          await pi.setModel(selectedAutoModel);
+        } finally {
+          applyingDecision = false;
+        }
+      }
     });
   };
+}
+
+function isSwitchyardAuto(model: PiModelLike | undefined): boolean {
+  return model?.provider === "switchyard" && model.id === "auto";
 }
 
 /**

@@ -132,7 +132,7 @@ export function signalsFromCatalog(models: ModelCapabilities[]): Record<string, 
   const signals: Record<string, RoutingSignal> = {};
   for (const m of models) {
     if (m.capabilityScore === undefined) continue;
-    signals[m.id] = { successRate: 0, rejectRate: 0, evalScore: m.capabilityScore };
+    signals[m.id] = { evalScore: m.capabilityScore };
   }
   return signals;
 }

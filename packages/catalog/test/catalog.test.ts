@@ -71,6 +71,7 @@ describe("catalog", () => {
     const models = [model("scored", "a", "large", 5, 0.7), model("unscored", "a", "mid", 1)];
     const signals = signalsFromCatalog(models);
     expect(signals["scored"]?.evalScore).toBeCloseTo(0.7);
+    expect(signals["scored"]?.successRate).toBeUndefined();
     expect(signals["unscored"]).toBeUndefined();
   });
 

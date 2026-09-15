@@ -8,6 +8,7 @@ import {
   createExtension,
   matchPiModel,
   judgeRun,
+  judgeRunStatus,
   readOutcomes,
   signalsFromOutcomes,
 } from "../src/index";
@@ -51,7 +52,13 @@ function fakePi(models: PiModelLike[]) {
     string,
     { description?: string; handler(args: string, ctx: PiContextLike): Promise<void> }
   > = {};
-  const calls: { model?: string; level?: string; notify?: string } = {};
+  const calls: {
+    model?: string;
+    models: string[];
+    level?: string;
+    notify?: string;
+    providers: Array<{ name: string; modelIds: string[] }>;
+  } = { models: [], providers: [] };
   const ctx: PiContextLike = {
     modelRegistry: { getAvailable: () => models },
     ui: { notify: (message: string) => (calls.notify = message) },
@@ -62,6 +69,8 @@ function fakePi(models: PiModelLike[]) {
     },
     setModel: (m: PiModelLike) => {
       calls.model = m.id;
+      calls.models.push(m.id);
+      ctx.model = m;
       return Promise.resolve(true);
     },
     setThinkingLevel: (level: string) => {
@@ -69,6 +78,9 @@ function fakePi(models: PiModelLike[]) {
     },
     registerCommand: (name, command) => {
       commands[name] = command;
+    },
+    registerProvider: (name, config) => {
+      calls.providers.push({ name, modelIds: config.models.map((entry) => entry.id) });
     },
   };
   return { pi, ctx, handlers, commands, calls };
@@ -269,7 +281,7 @@ describe("pi adapter", () => {
     expect(calls.notify).toBe("Switchyard classification cache cleared.");
   });
 
-  it("records the outcome and learns from it", async () => {
+  it("records normal completion without treating it as verified success", async () => {
     const file = tempFile();
     const { pi, ctx, handlers } = fakePi(available);
     createExtension({
@@ -289,7 +301,29 @@ describe("pi adapter", () => {
 
     const outcomes = await readOutcomes(file);
     expect(outcomes).toHaveLength(1);
-    expect(outcomes[0].success).toBe(true);
+    expect(outcomes[0].status).toBe("completed");
+    expect(signalsFromOutcomes(outcomes)[`${outcomes[0].modelId}|${outcomes[0].kind}`]).toBeUndefined();
+  });
+
+  it("learns only after the user explicitly verifies the last run", async () => {
+    const file = tempFile();
+    const { pi, ctx, handlers, commands } = fakePi(available);
+    createExtension({
+      loadSnapshot: async () => snapshotOf([cheap, flash, sol]),
+      outcomeFile: file,
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
+      failureFile: tempFile(),
+      quiet: true,
+    })(pi);
+
+    await handlers.before_agent_start!({ prompt: "rename the variable total to orderTotal" }, ctx);
+    await handlers.agent_end!({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+    await commands["switchyard-mark-success"]!.handler("", ctx);
+
+    const outcomes = await readOutcomes(file);
+    expect(outcomes.map((outcome) => outcome.status)).toEqual(["completed", "verified_success"]);
+    expect(outcomes[0].runId).toBe(outcomes[1].runId);
     expect(signalsFromOutcomes(outcomes)[`${outcomes[0].modelId}|${outcomes[0].kind}`]?.successRate).toBe(1);
   });
 
@@ -299,6 +333,109 @@ describe("pi adapter", () => {
     expect(judgeRun([{ role: "assistant", stopReason: "stop" }])).toBe(true);
     expect(judgeRun([{ role: "user", content: "never answered" }])).toBe(false);
     expect(judgeRun([])).toBe(false);
+    expect(judgeRunStatus([{ role: "assistant", stopReason: "stop" }])).toBe("completed");
+    expect(judgeRunStatus([{ role: "assistant", stopReason: "error" }])).toBe("failed");
+  });
+
+  it("refreshes the catalog and quota after the freshness window", async () => {
+    let clock = 1_000;
+    let loads = 0;
+    const apiLarge = classifierModel("api/large", 3, 0.8, "large");
+    const { pi, ctx, handlers, calls } = fakePi([
+      ...available,
+      { id: apiLarge.id, provider: "openrouter" },
+    ]);
+    createExtension({
+      loadSnapshot: async () => {
+        loads += 1;
+        return snapshotOf([apiLarge, sol], {
+          "codex-sol":
+            loads === 1
+              ? {
+                  available: true,
+                  usage: { remainingFraction: 0.9, windowElapsedFraction: 0.1, source: "test" },
+                }
+              : { available: false, reason: "quota exhausted" },
+        });
+      },
+      now: () => clock,
+      snapshotFreshnessMs: 10 * 60 * 1000,
+      escalation: "never",
+      outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
+      failureFile: tempFile(),
+      quiet: true,
+    })(pi);
+
+    const prompt = "rewrite the distributed billing service architecture from scratch";
+    await handlers.before_agent_start!({ prompt }, ctx);
+    clock += 9 * 60 * 1000;
+    await handlers.before_agent_start!({ prompt }, ctx);
+    expect(loads).toBe(1);
+
+    clock += 2 * 60 * 1000;
+    await handlers.before_agent_start!({ prompt }, ctx);
+    expect(loads).toBe(2);
+    expect(calls.models.slice(0, 2)).toEqual(["gpt-5.6-sol", "gpt-5.6-sol"]);
+    expect(calls.models.at(-1)).toBe("api/large");
+  });
+
+  it("offers an opt-in auto model while leaving pinned models untouched", async () => {
+    const pinned = { id: "gpt-5.6-sol", provider: "openai-codex", name: "Sol" };
+    const auto = { id: "auto", provider: "switchyard", name: "Switchyard Auto" };
+    const { pi, ctx, handlers, calls } = fakePi(available);
+    ctx.model = pinned;
+    createExtension({
+      loadSnapshot: async () => snapshotOf([cheap, flash, sol]),
+      routingScope: "selected-model",
+      escalation: "never",
+      outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
+      failureFile: tempFile(),
+      quiet: true,
+    })(pi);
+
+    expect(calls.providers).toContainEqual({ name: "switchyard", modelIds: ["auto"] });
+    await handlers.before_agent_start!({ prompt: "rename a pinned role variable" }, ctx);
+    expect(calls.model).toBeUndefined();
+
+    ctx.model = auto;
+    await handlers.before_agent_start!({ prompt: "rename an auto role variable" }, ctx);
+    expect(calls.model).toBeDefined();
+    await handlers.agent_end!({ messages: [{ role: "assistant", stopReason: "stop" }] }, ctx);
+    expect(calls.model).toBe("auto");
+    expect(ctx.model).toEqual(auto);
+  });
+
+  it("routes an OMP prewalk handoff into the auto role during an active run", async () => {
+    const pinned = { id: "gpt-5.6-sol", provider: "openai-codex", name: "Sol" };
+    const auto = { id: "auto", provider: "switchyard", name: "Switchyard Auto" };
+    const { pi, ctx, handlers, calls } = fakePi(available);
+    ctx.model = pinned;
+    createExtension({
+      loadSnapshot: async () => snapshotOf([cheap, flash, sol]),
+      routingScope: "selected-model",
+      escalation: "never",
+      outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
+      failureFile: tempFile(),
+      quiet: true,
+    })(pi);
+
+    await handlers.before_agent_start!(
+      { prompt: "inspect the repository, then implement the focused change" },
+      ctx,
+    );
+    await handlers.agent_start!({}, ctx);
+    expect(calls.model).toBeUndefined();
+
+    ctx.model = auto;
+    await handlers.model_select!({ model: auto }, ctx);
+    expect(calls.model).toBeDefined();
+    expect(calls.model).not.toBe("auto");
   });
 });
 

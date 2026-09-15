@@ -207,6 +207,22 @@ describe("scoring", () => {
     expect(failed.pFail).toBeGreaterThan(0.9);
   });
 
+  it("uses capability as the cold-start prior when history is absent", () => {
+    const task = { objective: "debug the worker", kind: "debug" as const, failureCostUsd: 10 };
+    const capable = { ...large, capabilityScore: 0.8 };
+    const withoutSignal = scoreCandidate(task, task.kind, capable, undefined, undefined, defaultQuotaConfig);
+    const benchmarkOnly = scoreCandidate(
+      task,
+      task.kind,
+      capable,
+      undefined,
+      { evalScore: 0.8 },
+      defaultQuotaConfig,
+    );
+    expect(benchmarkOnly.pFail).toBeCloseTo(withoutSignal.pFail);
+    expect(benchmarkOnly.pFail).toBeLessThan(0.5);
+  });
+
   it("prefers paid-for capacity on complex work but not on trivial work", () => {
     const cash = { ...api("cash-large", "large", 0.15, 0.75), capabilityScore: 0.72 };
     const sub = subscription("codex-sol", "large", 0.5, 0.774);
