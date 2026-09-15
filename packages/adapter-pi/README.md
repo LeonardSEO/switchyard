@@ -31,6 +31,13 @@ are never stored in this cache.
 omp plugin install @vepando/switchyard
 ```
 
+Or add the repository as an OMP marketplace and install from its catalog:
+
+```bash
+omp plugin marketplace add LeonardSEO/switchyard
+omp plugin install switchyard@switchyard
+```
+
 Restart OMP or run `/reload-plugins`. OMP's built-in `auto` thinking mode
 selects reasoning effort for the current model. Switchyard additionally selects
 the model using capability, price, context, measured outcomes, and optional

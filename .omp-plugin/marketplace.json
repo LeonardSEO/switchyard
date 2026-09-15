@@ -1,0 +1,38 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "switchyard",
+  "owner": {
+    "name": "LeonardSEO"
+  },
+  "metadata": {
+    "description": "Model routing plugins for coding agents",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "switchyard",
+      "description": "Route each OMP task to a capable, cost-effective model using live pricing, reliability, context, and optional Codex capacity",
+      "source": "./packages/adapter-pi",
+      "version": "0.3.3",
+      "author": {
+        "name": "LeonardSEO"
+      },
+      "homepage": "https://github.com/LeonardSEO/switchyard",
+      "repository": "https://github.com/LeonardSEO/switchyard",
+      "license": "Apache-2.0",
+      "keywords": [
+        "omp",
+        "model-router",
+        "openrouter",
+        "codex",
+        "cost-optimization"
+      ],
+      "category": "development",
+      "tags": [
+        "ai",
+        "coding-agent",
+        "model-routing"
+      ]
+    }
+  ]
+}
