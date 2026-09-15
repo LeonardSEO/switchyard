@@ -51,6 +51,7 @@ opencode plugin @vepando/switchyard
 ```
 
 Restart OpenCode and choose `switchyard/auto`. Switchyard starts its local gateway and registers the provider automatically.
+It reuses the OpenRouter API credential saved by OpenCode. An explicit `OPENROUTER_API_KEY` takes precedence.
 
 Upgrading an existing installation? Run `opencode plugin @vepando/switchyard@latest --force` once so OpenCode refreshes its package cache.
 
@@ -91,7 +92,7 @@ The model can change as pricing, capability evidence, reliability, latency, cont
 
 ## OpenRouter first, Codex optional
 
-Set `OPENROUTER_API_KEY` or use credentials exposed by the host. When `codex login` is available, supported Codex subscription models can join the candidate pool. Switchyard favors capacity that would otherwise expire, makes scarce capacity more expensive, and reserves the final 10%.
+Set `OPENROUTER_API_KEY` or let the OpenCode integration reuse OpenCode's saved OpenRouter credential. When `codex login` is available, supported Codex subscription models can join the candidate pool. Switchyard favors capacity that would otherwise expire, makes scarce capacity more expensive, and reserves the final 10%.
 
 ## Privacy
 

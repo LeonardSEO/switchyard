@@ -1,4 +1,7 @@
 import { createGateway, type Gateway } from "@vepando/switchyard-gateway";
+import { resolveOpenRouterApiKey } from "./credentials.js";
+
+export { resolveOpenRouterApiKey } from "./credentials.js";
 
 /**
  * OpenCode plugin.
@@ -30,9 +33,15 @@ export interface OpenCodeConfig {
   provider?: Record<string, unknown>;
 }
 
+interface EnsureGatewayDependencies {
+  resolveApiKey?: () => Promise<string | undefined>;
+  startGateway?: typeof createGateway;
+}
+
 export async function ensureGateway(
   port = Number(process.env.SWITCHYARD_PORT ?? DEFAULT_PORT),
   fetchFn: typeof fetch = fetch,
+  dependencies: EnsureGatewayDependencies = {},
 ): Promise<GatewayHandle> {
   const baseUrl = `http://127.0.0.1:${port}/v1`;
   try {
@@ -44,7 +53,8 @@ export async function ensureGateway(
 
   let gateway: Gateway;
   try {
-    gateway = await createGateway({ port, apiKey: process.env.OPENROUTER_API_KEY });
+    const apiKey = await (dependencies.resolveApiKey ?? resolveOpenRouterApiKey)();
+    gateway = await (dependencies.startGateway ?? createGateway)({ port, apiKey });
   } catch (err) {
     if (isAddressInUse(err)) {
       return { port, baseUrl, started: false };

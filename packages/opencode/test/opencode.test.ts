@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { configureOpenCode, createOpenCodePlugin, providerConfig } from "../src/index.js";
+import { configureOpenCode, createOpenCodePlugin, ensureGateway, providerConfig, resolveOpenRouterApiKey } from "../src/index.js";
 
 describe("OpenCode plugin", () => {
   it("builds an OpenAI-compatible Switchyard provider", () => {
@@ -71,5 +71,58 @@ describe("OpenCode plugin", () => {
     await hooks.dispose();
 
     expect(close).not.toHaveBeenCalled();
+  });
+
+  it("prefers an explicit OpenRouter environment credential", async () => {
+    const readTextFile = vi.fn(async () => JSON.stringify({
+      openrouter: { type: "api", key: "saved-key" },
+    }));
+
+    await expect(resolveOpenRouterApiKey({
+      env: { OPENROUTER_API_KEY: " explicit-key " },
+      readTextFile,
+    })).resolves.toBe("explicit-key");
+    expect(readTextFile).not.toHaveBeenCalled();
+  });
+
+  it("reuses the OpenRouter API credential saved by OpenCode", async () => {
+    const readTextFile = vi.fn(async () => JSON.stringify({
+      openrouter: { type: "api", key: " saved-key " },
+    }));
+
+    await expect(resolveOpenRouterApiKey({
+      env: { XDG_DATA_HOME: "/tmp/opencode-data" },
+      readTextFile,
+    })).resolves.toBe("saved-key");
+    expect(readTextFile).toHaveBeenCalledWith("/tmp/opencode-data/opencode/auth.json");
+  });
+
+  it("ignores missing, malformed, and unsupported OpenCode credentials", async () => {
+    await expect(resolveOpenRouterApiKey({
+      env: {},
+      readTextFile: async () => "not-json",
+    })).resolves.toBeUndefined();
+    await expect(resolveOpenRouterApiKey({
+      env: {},
+      readTextFile: async () => JSON.stringify({ openrouter: { type: "oauth", key: "wrong-type" } }),
+    })).resolves.toBeUndefined();
+  });
+
+  it("passes the resolved OpenCode credential to a newly started gateway", async () => {
+    const close = vi.fn(async () => undefined);
+    const startGateway = vi.fn(async () => ({ port: 8787, close, handle: vi.fn() }));
+
+    const handle = await ensureGateway(
+      8787,
+      vi.fn(async () => { throw new Error("not running"); }) as unknown as typeof fetch,
+      {
+        resolveApiKey: async () => "saved-key",
+        startGateway,
+      },
+    );
+
+    expect(startGateway).toHaveBeenCalledWith({ port: 8787, apiKey: "saved-key" });
+    expect(handle.started).toBe(true);
+    await handle.close?.();
   });
 });
