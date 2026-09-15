@@ -2,6 +2,13 @@
 
 Notable changes to Switchyard are documented here.
 
+## 0.3.4 - 2026-09-15
+
+### Fixed
+
+- Reuse the OpenRouter API credential saved by OpenCode when `OPENROUTER_API_KEY` is not explicitly set.
+- Keep an explicit `OPENROUTER_API_KEY` as the highest-priority credential source.
+
 ## 0.3.3 - 2026-09-15
 
 ### Added
