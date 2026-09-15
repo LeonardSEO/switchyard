@@ -1,6 +1,10 @@
 # Contributing to Switchyard
 
-Issues and focused pull requests are welcome. For substantial behavior changes, open an issue first so the routing contract and compatibility impact can be discussed.
+Issues and focused pull requests are welcome. Use the bug or feature issue form
+so reports include the affected integration, version, reproduction, and routing
+impact. For substantial behavior changes, open an issue first so the routing
+contract and compatibility impact can be discussed. Report vulnerabilities
+privately through GitHub Security, as described in [SECURITY.md](SECURITY.md).
 
 ## Local development
 

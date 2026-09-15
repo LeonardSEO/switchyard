@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/LeonardSEO/switchyard/security/advisories/new
+    about: Report credential exposure, data disclosure, authentication problems, and other security issues privately.
+  - name: Documentation and setup
+    url: https://github.com/LeonardSEO/switchyard#readme
+    about: Check installation, configuration, supported integrations, and current limitations before opening an issue.

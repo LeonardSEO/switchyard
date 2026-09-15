@@ -1,0 +1,126 @@
+name: Bug report
+description: Report reproducible behavior that is incorrect or unexpected
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve Switchyard. Please search existing issues and test the latest release before reporting.
+
+        Do not include API keys, tokens, private prompts, source code, or customer data. Report security vulnerabilities through the private security advisory link instead.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I tested the latest published Switchyard version or current `main`.
+          required: true
+        - label: I searched existing open and closed issues for duplicates.
+          required: true
+        - label: I removed credentials, private prompts, source code, customer data, and identifying file paths.
+          required: true
+        - label: This is not a security vulnerability.
+          required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Switchyard version
+      description: Run `npm view @vepando/switchyard version` or provide the exact commit SHA.
+      placeholder: "0.3.5"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration
+      description: Where did the problem occur?
+      options:
+        - Pi
+        - Oh My Pi (OMP)
+        - OpenCode
+        - OpenAI-compatible gateway
+        - Package API / custom integration
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: host-version
+    attributes:
+      label: Host version
+      description: Include the Pi, OMP, OpenCode, Node.js, or client version involved.
+      placeholder: "OMP 18.2.0, Node.js 22"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider path
+      options:
+        - OpenRouter
+        - Codex subscription
+        - Local OpenAI-compatible provider
+        - Automatic / unknown
+        - Other
+    validations:
+      required: true
+
+  - type: dropdown
+    id: regression
+    attributes:
+      label: Did this work in an earlier Switchyard version?
+      options:
+        - Unknown / not tested
+        - Yes, this is a regression
+        - No, it has never worked
+    validations:
+      required: true
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: What happened?
+      description: Describe the incorrect behavior and its impact in a few precise sentences.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest reliable sequence that reproduces the problem.
+      placeholder: |
+        1. Configure ...
+        2. Start ...
+        3. Send ...
+        4. Observe ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: What should Switchyard have done instead?
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Relevant logs or routing evidence
+      description: Paste only sanitized output, error messages, selected model information, or a minimal trace.
+      render: shell
+
+  - type: textarea
+    id: configuration
+    attributes:
+      label: Relevant configuration
+      description: Include only the settings needed to reproduce the issue. Remove all credentials and private data.
+      render: yaml

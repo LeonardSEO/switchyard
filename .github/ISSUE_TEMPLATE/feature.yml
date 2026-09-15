@@ -1,0 +1,76 @@
+name: Feature request
+description: Propose a focused improvement to Switchyard routing or integrations
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Explain the problem first, then the proposed behavior. Concrete examples and compatibility considerations make requests much easier to evaluate.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing open and closed issues for a similar request.
+          required: true
+        - label: I am proposing one focused change and described the underlying problem, not only a preferred implementation.
+          required: true
+        - label: I removed credentials, private prompts, source code, customer data, and identifying file paths.
+          required: true
+
+  - type: dropdown
+    id: integration
+    attributes:
+      label: Integration or component
+      options:
+        - Routing core / scoring
+        - Model catalog or quota
+        - Pi
+        - Oh My Pi (OMP)
+        - OpenCode
+        - OpenAI-compatible gateway
+        - Packaging or release
+        - Documentation
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What workflow is difficult or impossible today, and who is affected?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired user-visible behavior. Examples are welcome.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: What existing configuration, command, or workaround did you try?
+
+  - type: textarea
+    id: compatibility
+    attributes:
+      label: Compatibility and routing impact
+      description: Could this affect existing model selection, provider behavior, tools, sessions, caching, cost, latency, or privacy?
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Suggested acceptance criteria
+      description: List observable conditions that would make the request complete.
+      placeholder: |
+        - [ ] Existing behavior remains available
+        - [ ] The new behavior is covered by a regression test
