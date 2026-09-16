@@ -69,7 +69,7 @@ describe("complexity", () => {
     expect(inferKind("design a migration plan")).toBe("plan");
   });
 
-  it("matches veto's thresholds and extends them with two rungs", () => {
+  it("classifies tasks across all six complexity rungs", () => {
     expect(keywordClassification({ objective: "build e2e CQRS infrastructure with event sourcing" }).complexity).toBe("frontier");
     expect(keywordClassification({ objective: "design the service architecture" }).complexity).toBe("advanced");
     expect(keywordClassification({ objective: "implement authentication service" }).complexity).toBe("moderate");

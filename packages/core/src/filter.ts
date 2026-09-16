@@ -38,9 +38,8 @@ export interface FilterContext {
 }
 
 /**
- * Hard filter. Veto's checks plus capacity; anything unknown is treated
- * conservatively: unknown tool support does not prune, unknown context does
- * not prune, unknown cost prunes only when a ceiling is set.
+ * Hard filter with conservative unknown handling: unknown tool support and
+ * context do not prune, while unknown cost prunes only under a cost ceiling.
  */
 export function filterCandidates(
   task: TaskSpec,

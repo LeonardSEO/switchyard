@@ -1,9 +1,6 @@
 import type { Complexity, TaskKind, TaskSpec } from "./types.js";
 
-/**
- * Complexity inference, ported from veto's pkg/router (keyword scoring) with
- * the matched keywords exposed so a route decision can explain itself.
- */
+/** Keyword-based complexity inference with matched evidence for explanations. */
 
 const HIGH = [
   "cqrs",

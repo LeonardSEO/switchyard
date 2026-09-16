@@ -2,7 +2,7 @@ import type { CapacityState, Known, ModelCapabilities, ReasoningEffort, Risk, Ro
 import { known } from "./types.js";
 import { effectiveInputPer1M, effectiveOutputPer1M, type QuotaConfig } from "./quota.js";
 
-/** Opus-class input cost, used as the "expensive" reference point (veto's ref). */
+/** Opus-class input cost used as the expensive reference point. */
 export const REFERENCE_INPUT_PER_1M = 15;
 /** Price at which a model is considered as cheap as it can usefully get. */
 export const CHEAP_FLOOR_PER_1M = 0.01;
@@ -121,7 +121,7 @@ export interface Weights {
   eval: number;
 }
 
-/** Ported from veto's scorer: cheapest-viable-first, quality as a tiebreaker. */
+/** Cheapest-viable-first weights with quality and reliability evidence. */
 export const defaultWeights: Weights = {
   cost: 0.35,
   success: 0.25,
@@ -144,8 +144,8 @@ export function kindMatch(m: ModelCapabilities, kind: TaskKind): number {
 export const DEFAULT_CONTEXT_TOKENS = 24_000;
 
 /**
- * Token estimate. Historical averages win; otherwise fall back to veto's shape
- * (input dominated by prompt, output ~10% of input) with a floor.
+ * Token estimate. Historical averages win; otherwise use an input-dominated
+ * request shape with output estimated at roughly 10% and a conservative floor.
  */
 export function estimateTokens(
   task: TaskSpec,
@@ -189,11 +189,8 @@ export const defaultCostScale: CostScale = {
 /**
  * Cost-efficiency score in [0, 1]. Unknown price scores at the floor (0.05).
  *
- * Deliberate divergence from veto: veto compares price linearly against an
- * opus reference, so everything below ~$1/M scores ~0.99 and a 10x price
- * difference between two cheap models is invisible. Almost every interesting
- * model now sits below $1/M, so we score on a log scale — a 10x difference
- * moves the score equally at the cheap and the expensive end.
+ * A logarithmic scale keeps price differences meaningful at both the cheap and
+ * expensive ends; a 10x difference moves the score by the same relative amount.
  */
 export function costFit(
   inputPer1M: Known<number>,

@@ -2,8 +2,6 @@ import type { CapacityState, Known, ModelCapabilities, Usage } from "./types.js"
 import { known, unknown } from "./types.js";
 
 /**
- * Quota intelligence: the piece veto does not have.
- *
  * A subscription model has no per-token invoice, so its marginal cost is not
  * zero and not the API list price either. We model it as:
  *

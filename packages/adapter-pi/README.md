@@ -116,5 +116,5 @@ Full documentation, configuration, architecture, security policy, and contributi
 
 Copyright 2026 Leonard van Hemert. Licensed under
 [Apache-2.0](https://github.com/LeonardSEO/switchyard/blob/main/LICENSE).
-Third-party attribution for the limited portions derived from veto is
-documented separately in [NOTICE](https://github.com/LeonardSEO/switchyard/blob/main/NOTICE).
+Required third-party attribution is documented separately in
+[NOTICE](https://github.com/LeonardSEO/switchyard/blob/main/NOTICE).

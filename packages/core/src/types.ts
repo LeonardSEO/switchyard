@@ -1,9 +1,7 @@
 /**
- * Core domain types for @vepando/switchyard-core.
- *
- * Ported concepts from veto (github.com/oleg-koval/veto, Apache-2.0) with one
- * deliberate extension: capacity/quota is a first-class routing input, and
- * "unknown", "known zero" and "known non-zero" are always distinct states.
+ * Core domain types for @vepando/switchyard-core. Capacity and quota are
+ * first-class routing inputs, and unknown, known zero, and known non-zero are
+ * deliberately distinct states.
  */
 
 export type TaskKind =
@@ -16,10 +14,8 @@ export type TaskKind =
   | "code-change";
 
 /**
- * Five rungs, not three. Veto's simple/moderate/complex collapses "rename a
- * variable" and "add a retry" into one bucket, and puts a single-file refactor
- * next to a distributed rewrite. The rung sets what a task demands, and demand
- * is what a model has to clear.
+ * Six rungs keep mechanical edits, contained features, architectural work, and
+ * frontier-scale rewrites in distinct demand bands.
  */
 export type Complexity =
   | "trivial"
@@ -132,7 +128,7 @@ export interface ModelCapabilities {
   pricing: Pricing;
 }
 
-/** Historical outcome signal, mirroring veto's RoutingSignal. */
+/** Historical outcome signal used to refine cold-start model evidence. */
 export interface RoutingSignal {
   /** Omit until at least one real or explicitly verified outcome exists. */
   successRate?: number;
