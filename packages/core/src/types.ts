@@ -141,6 +141,10 @@ export interface RoutingSignal {
   evalScore?: number;
   avgInputTokens?: number;
   avgOutputTokens?: number;
+  /** Raw verified outcomes behind this rate. */
+  sampleCount?: number;
+  /** Recency-weighted sample mass, used to shrink sparse history to the benchmark prior. */
+  effectiveSampleSize?: number;
 }
 
 /**
@@ -159,6 +163,8 @@ export interface TaskSpec {
   objective: string;
   /** Compact repository context used only for task classification. */
   projectContext?: string;
+  /** Privacy-safe project identity used only to select project-local outcome history. */
+  projectScope?: string;
   /** Omit to infer from the objective. */
   kind?: TaskKind;
   /** Omit to infer from the objective. */

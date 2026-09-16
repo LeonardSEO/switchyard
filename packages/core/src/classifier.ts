@@ -1,6 +1,7 @@
 import type { Complexity, ModelCapabilities, TaskKind, TaskSpec } from "./types.js";
 import { estimateTokens } from "./scorer.js";
 import {
+  COMPLEXITY_SCORE_THRESHOLDS,
   estimateComplexity,
   inferComplexity,
   inferKind,
@@ -52,7 +53,9 @@ export function keywordClassification(task: TaskSpec): Classification {
   if (est.source === "explicit") {
     return { kind, complexity: est.complexity, confidence: 1, source: "explicit" };
   }
-  const distanceToThreshold = Math.min(Math.abs(est.score - 1), Math.abs(est.score - 4));
+  const distanceToThreshold = Math.min(
+    ...COMPLEXITY_SCORE_THRESHOLDS.map((threshold) => Math.abs(est.score - threshold)),
+  );
   const confidence = Math.max(0.3, Math.min(0.85, 0.3 + distanceToThreshold * 0.15));
   return {
     kind,
@@ -72,8 +75,8 @@ export class KeywordClassifier implements Classifier {
 
 export function isUncertain(c: Classification): boolean {
   if (c.source !== "keyword" || c.score === undefined) return false;
-  return (
-    Math.abs(c.score - 1) < UNCERTAINTY_BAND || Math.abs(c.score - 4) < UNCERTAINTY_BAND
+  return COMPLEXITY_SCORE_THRESHOLDS.some(
+    (threshold) => Math.abs(c.score! - threshold) < UNCERTAINTY_BAND,
   );
 }
 

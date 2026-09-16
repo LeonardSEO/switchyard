@@ -238,6 +238,85 @@ describe("pi adapter", () => {
     expect(["high", "xhigh", "max"]).toContain(calls.level);
   });
 
+  it("propagates live context and selected tools into candidate filtering", async () => {
+    const constrained = {
+      ...cheap,
+      maxContextTokens: 100,
+      supportsTools: [],
+    };
+    const capable = {
+      ...flash,
+      maxContextTokens: 100_000,
+      supportsTools: ["bash"],
+    };
+    const { pi, ctx, handlers, calls } = fakePi(available);
+    ctx.getContextUsage = () => ({ tokens: 5_000, contextWindow: 100_000, percent: 5 });
+    createExtension({
+      loadSnapshot: async () => snapshotOf([constrained, capable]),
+      escalation: "never",
+      admissionPolicy: "ignore",
+      outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
+      failureFile: tempFile(),
+      quiet: true,
+    })(pi);
+
+    await handlers.before_agent_start!(
+      { prompt: "rename a variable", systemPromptOptions: { selectedTools: ["bash"] } },
+      ctx,
+    );
+
+    expect(calls.model).toBe(capable.id);
+  });
+
+  it("surfaces an admitted high-risk route unless explicitly ignored", async () => {
+    const run = async (admissionPolicy: "notify" | "ignore") => {
+      const { pi, ctx, handlers, calls } = fakePi(available);
+      createExtension({
+        loadSnapshot: async () => snapshotOf([cheap, flash]),
+        escalation: "never",
+        admissionPolicy,
+        buildTaskSpec: () => ({ risk: "high", maxCostUsd: 1 }),
+        outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
+        quiet: false,
+      })(pi);
+      await handlers.before_agent_start!({ prompt: "rename a variable" }, ctx);
+      return calls.notify ?? "";
+    };
+
+    expect(await run("notify")).toContain("admission required");
+    expect(await run("ignore")).not.toContain("admission required");
+  });
+
+  it("can escalate an ambiguous cheap route to the nearest stronger candidate", async () => {
+    const strong = model("provider/strong", "provider", "api", 10, 0.691);
+    const run = async (admissionPolicy: "escalate" | "ignore") => {
+      const { pi, ctx, handlers, calls } = fakePi([
+        { id: cheap.id, provider: "openrouter" },
+        { id: strong.id, provider: "provider" },
+      ]);
+      createExtension({
+        loadSnapshot: async () => snapshotOf([cheap, strong]),
+        escalation: "never",
+        admissionPolicy,
+        outcomeFile: tempFile(),
+        cacheFile: tempFile(),
+        latencyFile: tempFile(),
+        failureFile: tempFile(),
+        quiet: true,
+      })(pi);
+      await handlers.before_agent_start!({ prompt: "rename a variable" }, ctx);
+      return calls.model;
+    };
+
+    expect(await run("ignore")).toBe(cheap.id);
+    expect(await run("escalate")).toBe(strong.id);
+  });
+
   it("leaves Pi alone when nothing in the catalog is runnable here", async () => {
     const { pi, ctx, handlers, calls } = fakePi([]);
     createExtension({
@@ -335,6 +414,48 @@ describe("pi adapter", () => {
     expect(judgeRun([])).toBe(false);
     expect(judgeRunStatus([{ role: "assistant", stopReason: "stop" }])).toBe("completed");
     expect(judgeRunStatus([{ role: "assistant", stopReason: "error" }])).toBe("failed");
+  });
+
+  it("weights recent verified outcomes and emits complexity/project buckets", () => {
+    const day = 24 * 60 * 60 * 1000;
+    const now = 100 * day;
+    const signals = signalsFromOutcomes(
+      [
+        {
+          runId: "old-success",
+          modelId: "m",
+          kind: "debug",
+          complexity: "complex",
+          projectScope: "p",
+          status: "verified_success",
+          at: now - 90 * day,
+        },
+        {
+          runId: "recent-failure",
+          modelId: "m",
+          kind: "debug",
+          complexity: "complex",
+          projectScope: "p",
+          status: "failed",
+          at: now,
+        },
+      ],
+      { now, halfLifeMs: 30 * day },
+    );
+
+    expect(signals["m|debug"]?.successRate).toBeLessThan(0.2);
+    expect(signals["m|debug|complex"]?.sampleCount).toBe(2);
+    expect(signals["m|debug|complex|p"]?.effectiveSampleSize).toBeCloseTo(1.125);
+  });
+
+  it("keeps legacy outcome records readable without treating completion as success", () => {
+    const signals = signalsFromOutcomes([
+      { modelId: "m", kind: "debug", complexity: "simple", success: true, at: 1 },
+      { modelId: "m", kind: "debug", complexity: "simple", success: false, at: 2 },
+    ]);
+
+    expect(signals["m|debug"]?.sampleCount).toBe(1);
+    expect(signals["m|debug"]?.successRate).toBe(0);
   });
 
   it("refreshes the catalog and quota after the freshness window", async () => {

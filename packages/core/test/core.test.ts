@@ -15,6 +15,8 @@ import {
   route,
   scarcity,
   scoreCandidate,
+  signalForTask,
+  smoothedSuccessRate,
   type Classification,
   type ModelCapabilities,
 } from "../src/index";
@@ -79,7 +81,34 @@ describe("complexity", () => {
     // "deploy" scores exactly 1, which sits on the threshold.
     const c = keywordClassification({ objective: "deploy" });
     expect(isUncertain(c)).toBe(true);
-    expect(isUncertain({ ...c, score: 6 })).toBe(false);
+    for (const score of [-3, 1, 3, 6, 8]) {
+      expect(isUncertain({ ...c, score })).toBe(true);
+    }
+    expect(isUncertain({ ...c, score: 4 })).toBe(false);
+  });
+});
+
+describe("outcome evidence", () => {
+  it("shrinks sparse verified history toward the benchmark prior", () => {
+    expect(
+      smoothedSuccessRate({ successRate: 1, sampleCount: 1, effectiveSampleSize: 1 }, 0.6),
+    ).toBeCloseTo(0.68);
+    expect(
+      smoothedSuccessRate({ successRate: 0, sampleCount: 1, effectiveSampleSize: 1 }, 0.6),
+    ).toBeCloseTo(0.48);
+    expect(
+      smoothedSuccessRate({ successRate: 1, sampleCount: 100, effectiveSampleSize: 100 }, 0.6),
+    ).toBeGreaterThan(0.98);
+  });
+
+  it("uses specific evidence only after it has enough samples", () => {
+    const signals = {
+      "m|debug": { successRate: 0.7, sampleCount: 10 },
+      "m|debug|complex": { successRate: 0.2, sampleCount: 2 },
+      "m|debug|complex|project": { successRate: 0.9, sampleCount: 3 },
+    };
+    expect(signalForTask(signals, "m", "debug", "complex", "project")?.successRate).toBe(0.9);
+    expect(signalForTask(signals, "m", "debug", "complex", "other")?.successRate).toBe(0.7);
   });
 });
 

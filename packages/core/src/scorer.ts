@@ -233,6 +233,24 @@ export interface ScoreBreakdown {
   expectedCostUsd: Known<number>;
 }
 
+/** Four equivalent benchmark observations keep tiny local samples from becoming absolutes. */
+export const HISTORY_PRIOR_WEIGHT = 4;
+
+export function smoothedSuccessRate(
+  signal: RoutingSignal | undefined,
+  prior: number | undefined,
+): number | undefined {
+  if (signal?.successRate === undefined) return prior;
+  const sampleMass = signal.effectiveSampleSize ?? signal.sampleCount;
+  // Preserve the public behavior of callers that supply a rate without the new
+  // sample metadata. Only outcome-derived rates are automatically shrunk.
+  if (sampleMass === undefined) return signal.successRate;
+  const benchmark = prior ?? UNMEASURED_CAPABILITY;
+  return (
+    benchmark * HISTORY_PRIOR_WEIGHT + signal.successRate * Math.max(0, sampleMass)
+  ) / (HISTORY_PRIOR_WEIGHT + Math.max(0, sampleMass));
+}
+
 export function scoreCandidate(
   task: TaskSpec,
   kind: TaskKind,
@@ -250,7 +268,9 @@ export function scoreCandidate(
   const estCost = scale(estimateCostUsd(m, task, cap, signal, cfg), premium);
   // History beats benchmarks, benchmarks beat nothing. Capability above what
   // the task demands is capped: it is noise, not value.
-  const raw = signal?.successRate ?? m.capabilityScore;
+  const historicalSuccess =
+    signal?.successRate === undefined ? undefined : smoothedSuccessRate(signal, m.capabilityScore);
+  const raw = historicalSuccess ?? m.capabilityScore;
   const ceiling = Math.min(demand + OVERQUALIFICATION_BAND, qualityCap ?? Number.POSITIVE_INFINITY);
   // Unmeasured gets the assumed level and the same ceiling. Returning
   // "undefined" here would silently skip the ceiling and hand unmeasured models
@@ -273,7 +293,7 @@ export function scoreCandidate(
   );
   const qualityScore =
     km * weights.kind +
-    (s?.successRate ?? 0) * weights.success +
+    (historicalSuccess ?? 0) * weights.success +
     fit * weights.cost +
     (1 - (s?.rejectRate ?? 0)) * weights.reject +
     evalScore * weights.eval;

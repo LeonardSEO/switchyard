@@ -141,6 +141,8 @@ All options are optional.
 | `projectContext` | Pi: `auto` (default) or `none`; disable repository context while keeping model classification |
 | `snapshotFreshnessMs` | Pi/OMP catalog and Codex-capacity refresh interval; default 10 minutes |
 | `routingScope` | Pi/OMP: `global` (default) or `selected-model`; the latter routes only `switchyard/auto` |
+| `admissionPolicy` | Pi/OMP: `notify` (default), `escalate`, or `ignore` when a route is complex, high-risk, or ambiguous |
+| `buildTaskSpec` | Pi/OMP callback for constraints the host cannot infer, such as `risk`, `maxCostUsd`, or `skipModels` |
 | `failureCostByRisk` | Tune the penalty for an unsuccessful attempt at each risk level |
 | `preferPaidCapacityFactor` | Control how much worse subscription capacity may score and still win; default `2` |
 | `SWITCHYARD_PORT` | Gateway port; default `8787` |
@@ -150,7 +152,10 @@ All options are optional.
 Pi and OMP record ordinary agent-loop completion as telemetry, not as proof that
 the code is correct. Use `/switchyard-mark-success` after verification passes or
 `/switchyard-mark-failure` after a rejected/failed result. Only explicit failures
-and verified successes update learned model success rates.
+and verified successes update learned model success rates. Outcome evidence is
+recency-weighted and smoothed toward the benchmark prior until enough samples
+exist. Complexity- and project-specific evidence is preferred only after at
+least three verified outcomes, otherwise routing falls back to broader history.
 
 ## Privacy and security
 
@@ -163,6 +168,9 @@ history. Missing manifests or instruction files are simply omitted. Context
 files can contain private project information; review them before enabling a
 remote classifier, use `projectContext: "none"` to exclude them, or set
 `escalation: "never"` to keep all classification local.
+
+Outcome records stay local in `~/.switchyard/outcomes.jsonl`. Project-specific
+learning stores a truncated hash of the project root, never the path itself.
 
 The OpenCode and standalone gateway integrations currently classify only the
 latest user objective, capped at 4,000 characters. The selected execution

@@ -42,6 +42,11 @@ export interface PiContextLike {
   /** Current model. OMP and recent Pi releases expose this to extensions. */
   model?: PiModelLike;
   cwd?: string;
+  getContextUsage?(): {
+    tokens: number | null;
+    contextWindow: number;
+    percent: number | null;
+  };
   ui?: { notify?(message: string, level?: string): void };
 }
 
@@ -55,6 +60,7 @@ export interface PiBeforeAgentStartEventLike {
   systemPromptOptions?: {
     cwd?: string;
     contextFiles?: PiContextFileLike[];
+    selectedTools?: string[];
   };
 }
 

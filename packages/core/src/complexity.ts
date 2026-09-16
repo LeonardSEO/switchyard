@@ -52,6 +52,9 @@ export interface ComplexityEstimate {
   source: "explicit" | "inferred";
 }
 
+/** Single source of truth for every boundary in the keyword complexity ladder. */
+export const COMPLEXITY_SCORE_THRESHOLDS = [-3, 1, 3, 6, 8] as const;
+
 export function inferKind(objective: string): TaskKind {
   const s = objective.toLowerCase();
   const any = (...words: string[]) => words.some((w) => s.includes(w));

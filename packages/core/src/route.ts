@@ -100,6 +100,33 @@ export const DEFAULT_FAILURE_COST_BY_RISK: Record<string, number> = {
   high: 25,
 };
 
+/** Avoid letting one or two project-specific outcomes overrule broader evidence. */
+export const MIN_SPECIFIC_SIGNAL_SAMPLES = 3;
+
+export function signalForTask(
+  signals: Record<string, RoutingSignal> | undefined,
+  modelId: string,
+  kind: TaskKind,
+  complexity: Complexity,
+  projectScope?: string,
+): RoutingSignal | undefined {
+  if (!signals) return undefined;
+  const specific = [
+    projectScope ? `${modelId}|${kind}|${complexity}|${projectScope}` : undefined,
+    `${modelId}|${kind}|${complexity}`,
+  ];
+  for (const key of specific) {
+    if (!key) continue;
+    const signal = signals[key];
+    // Signals supplied by older/external callers have no count and retain
+    // their historical precedence. New fine-grained buckets must earn it.
+    if (signal && (signal.sampleCount === undefined || signal.sampleCount >= MIN_SPECIFIC_SIGNAL_SAMPLES)) {
+      return signal;
+    }
+  }
+  return signals[`${modelId}|${kind}`] ?? signals[modelId];
+}
+
 export function route(
   task: TaskSpec,
   models: ModelCapabilities[],
@@ -130,10 +157,7 @@ export function route(
     .map((m) => {
       // Per-kind history wins over global history: a model that fails at
       // debugging can still be the best choice for summarising.
-      const signal =
-        (opts.signals?.[`${m.id}|${kind}`] ?? opts.signals?.[m.id]) as
-          | RoutingSignal
-          | undefined;
+      const signal = signalForTask(opts.signals, m.id, kind, complexity, task.projectScope);
       const s = scoreCandidate(
         priced,
         kind,
@@ -177,7 +201,7 @@ export function route(
           kind,
           r.model,
           opts.capacity?.[r.model.id],
-          opts.signals?.[`${r.model.id}|${kind}`] ?? opts.signals?.[r.model.id],
+          signalForTask(opts.signals, r.model.id, kind, complexity, task.projectScope),
           cfg,
           weights,
           demand,

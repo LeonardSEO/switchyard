@@ -2,6 +2,19 @@
 
 Notable changes to Switchyard are documented here.
 
+## 0.3.6 - 2026-09-16
+
+### Fixed
+
+- Use every boundary in the six-level complexity ladder when deciding whether keyword classification is uncertain.
+- Preserve the core admission decision in Pi/OMP and expose an explicit notify, escalate, or ignore policy.
+- Pass live context size and selected tools from Pi/OMP into core routing, with a callback for operator-supplied risk and cost constraints.
+- Prevent sparse or stale outcome history from overriding benchmark priors through sample-aware smoothing and recency weighting.
+
+### Added
+
+- Learn at model, task-kind, complexity, and privacy-safe project scopes, with broader fallback while a specific bucket is sparse.
+
 ## 0.3.5 - 2026-09-15
 
 ### Fixed

@@ -12,8 +12,9 @@ import {
   type CompletionFn,
   type ModelCapabilities,
   type RoutingSignal,
+  type TaskSpec,
 } from "@vepando/switchyard-core";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Snapshot } from "@vepando/switchyard-catalog";
 import { signalsFromCatalog } from "@vepando/switchyard-catalog";
 import type {
@@ -90,6 +91,15 @@ export interface AdapterOptions {
   now?: () => number;
   /** Route every turn, or only turns started through `switchyard/auto`. */
   routingScope?: "global" | "selected-model";
+  /** What to do when core marks a route complex, high-risk, or ambiguous. Default: notify. */
+  admissionPolicy?: "escalate" | "notify" | "ignore";
+  /** Supply constraints Pi/OMP cannot infer, such as risk or a per-turn cost ceiling. */
+  buildTaskSpec?: (
+    event: PiBeforeAgentStartEventLike,
+    ctx: PiContextLike,
+  ) =>
+    | Partial<Omit<TaskSpec, "objective" | "projectContext" | "projectScope">>
+    | Promise<Partial<Omit<TaskSpec, "objective" | "projectContext" | "projectScope">>>;
 }
 
 /**
@@ -108,6 +118,7 @@ interface PendingRun {
   complexity: string;
   effort: string;
   classifier?: string;
+  projectScope?: string;
 }
 
 /**
@@ -337,8 +348,8 @@ export function createExtension(opts: AdapterOptions = {}) {
       }
 
       let projectContext = "";
+      const cwd = event.systemPromptOptions?.cwd ?? ctx.cwd ?? process.cwd();
       if (opts.projectContext !== "none") {
-        const cwd = event.systemPromptOptions?.cwd ?? ctx.cwd ?? process.cwd();
         const loadedContextFiles = event.systemPromptOptions?.contextFiles ?? [];
         const contextFilesKey = loadedContextFiles
           .map((file) => `${file.path ?? ""}:${file.content ?? ""}`)
@@ -371,6 +382,18 @@ export function createExtension(opts: AdapterOptions = {}) {
       }
       if (routable.length === 0) return;
 
+      const hostContextTokens = ctx.getContextUsage?.().tokens ?? undefined;
+      const hostTools = event.systemPromptOptions?.selectedTools;
+      const supplied = await Promise.resolve(opts.buildTaskSpec?.(event, ctx)).catch(() => ({}));
+      const task: TaskSpec = {
+        ...(hostContextTokens === undefined ? {} : { contextTokens: hostContextTokens }),
+        ...(hostTools?.length ? { requiredTools: hostTools } : {}),
+        ...supplied,
+        objective,
+        projectContext: projectContext || undefined,
+        projectScope: projectScopeFor(cwd),
+      };
+
       let classification: Classification;
       const threshold = opts.reuseSimilarity ?? DEFAULT_REUSE_SIMILARITY;
       const reuse =
@@ -382,7 +405,7 @@ export function createExtension(opts: AdapterOptions = {}) {
         classification = { ...lastClassification, source: "model" };
       } else {
         classification = await getClassifier(ctx, snapshot).then((c) =>
-          c.classify({ objective, projectContext: projectContext || undefined }),
+          c.classify(task),
         );
         // A provider/auth/HTTP failure degrades to the local classifier. That
         // keeps this turn working, but it must not become a reusable session
@@ -400,10 +423,17 @@ export function createExtension(opts: AdapterOptions = {}) {
       const outcomes = await readOutcomes(opts.outcomeFile);
       const signals: Record<string, RoutingSignal> = {
         ...signalsFromCatalog(snapshot.models),
-        ...signalsFromOutcomes(outcomes),
+        ...signalsFromOutcomes(outcomes, { now: now() }),
       };
 
-      const decision = routeSafely(objective, routable, classification, snapshot, signals);
+      const decision = routeSafely(
+        task,
+        routable,
+        classification,
+        snapshot,
+        signals,
+        opts.admissionPolicy ?? "notify",
+      );
       if (!decision) return;
 
       const target = piModelByModelId.get(decision.modelId);
@@ -421,6 +451,7 @@ export function createExtension(opts: AdapterOptions = {}) {
             : reuse
               ? `${classification.source}:reused`
               : classification.source,
+        projectScope: task.projectScope,
       };
 
       try {
@@ -442,7 +473,7 @@ export function createExtension(opts: AdapterOptions = {}) {
         ctx.ui?.notify?.(
           `switchyard → ${decision.modelId} (${decision.complexity}, effort ${decision.effort}${
             decision.price === undefined ? "" : `, $${decision.price.toFixed(3)}/M`
-          })`,
+          }${decision.admissionAction ? `, ${decision.admissionAction}` : ""})`,
           "info",
         );
       }
@@ -501,6 +532,11 @@ function isSwitchyardAuto(model: PiModelLike | undefined): boolean {
   return model?.provider === "switchyard" && model.id === "auto";
 }
 
+/** Stable local scope without writing the user's project path to telemetry. */
+export function projectScopeFor(cwd: string): string {
+  return createHash("sha256").update(cwd).digest("hex").slice(0, 16);
+}
+
 /**
  * Word-overlap between two objectives. Cheap, local, and good enough to tell
  * "still working on the same thing" from "moved on to something else".
@@ -522,27 +558,51 @@ export function taskSimilarity(a: string, b: string): number {
 }
 
 function routeSafely(
-  objective: string,
+  task: TaskSpec,
   routable: ModelCapabilities[],
   classification: Classification,
   snapshot: Snapshot,
   signals: Record<string, RoutingSignal>,
+  admissionPolicy: "escalate" | "notify" | "ignore",
 ) {
   try {
     const decision = route(
-      { objective },
+      task,
       routable,
       classification,
       { capacity: snapshot.capacity, signals },
     );
     if (!decision.model) return undefined;
-    const price = effectiveInputPer1M(decision.model, snapshot.capacity[decision.model.id]);
+    let selected = decision.model;
+    let admissionAction: string | undefined;
+    if (decision.admissionRequired && admissionPolicy === "escalate") {
+      const selectedCapability = selected.capabilityScore ?? 0;
+      const stronger = decision.ranked
+        .filter((candidate) => (candidate.model.capabilityScore ?? 0) > selectedCapability)
+        .sort(
+          (a, b) =>
+            (a.model.capabilityScore ?? Number.POSITIVE_INFINITY) -
+            (b.model.capabilityScore ?? Number.POSITIVE_INFINITY),
+        )[0]?.model;
+      if (stronger) {
+        selected = stronger;
+        admissionAction = `admission escalated from ${decision.model.id}`;
+      } else {
+        admissionAction = "admission required; no stronger runnable model";
+      }
+    } else if (decision.admissionRequired && admissionPolicy === "notify") {
+      admissionAction = "admission required";
+    }
+    const price = effectiveInputPer1M(selected, snapshot.capacity[selected.id]);
     return {
-      modelId: decision.model.id,
+      modelId: selected.id,
       kind: decision.kind,
       complexity: decision.complexity,
       effort: decision.effort,
       price: price.known ? price.value : undefined,
+      admissionRequired: decision.admissionRequired,
+      admissionAction,
+      reason: decision.reason,
     };
   } catch {
     return undefined;

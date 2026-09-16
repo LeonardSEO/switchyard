@@ -18,6 +18,8 @@ export interface Outcome {
   effort?: string;
   /** Which classifier decided the rung: keyword, model, explicit, or degraded. */
   classifier?: string;
+  /** Truncated hash of the project root; never the local path itself. */
+  projectScope?: string;
   /** New records distinguish technical completion from verified correctness. */
   status?: OutcomeStatus;
   /** Legacy v0.3.4-and-earlier field, retained while old JSONL files are read. */
@@ -28,6 +30,7 @@ export interface Outcome {
 export type OutcomeStatus = "completed" | "verified_success" | "failed";
 
 const MAX_RECORDS = 5_000;
+export const OUTCOME_HALF_LIFE_MS = 30 * 24 * 60 * 60 * 1000;
 
 export function outcomesPath(home = process.env.HOME ?? "."): string {
   return `${home}/.switchyard/outcomes.jsonl`;
@@ -68,26 +71,51 @@ export async function readOutcomes(path = outcomesPath()): Promise<Outcome[]> {
  * Per (model, kind) success rates. A model that fails at debugging is still the
  * right choice for summarising, so the key keeps them apart.
  */
-export function signalsFromOutcomes(outcomes: Outcome[]): Record<string, RoutingSignal> {
+export function signalsFromOutcomes(
+  outcomes: Outcome[],
+  options: { now?: number; halfLifeMs?: number } = {},
+): Record<string, RoutingSignal> {
   const finalOutcomes = new Map<string, Outcome>();
   outcomes.forEach((outcome, index) => {
     finalOutcomes.set(outcome.runId ?? `legacy:${index}`, outcome);
   });
-  const tally = new Map<string, { ok: number; total: number }>();
+  const now = options.now ?? Date.now();
+  const halfLifeMs = options.halfLifeMs ?? OUTCOME_HALF_LIFE_MS;
+  const tally = new Map<string, { ok: number; total: number; weight: number; okWeight: number }>();
   for (const o of finalOutcomes.values()) {
     const status = outcomeStatus(o);
     // A clean agent-loop completion says nothing about whether the requested
     // code is correct. Only explicit verification and explicit failure teach.
     if (status === "completed") continue;
-    const key = `${o.modelId}|${o.kind}`;
-    const t = tally.get(key) ?? { ok: 0, total: 0 };
-    t.total += 1;
-    if (status === "verified_success") t.ok += 1;
-    tally.set(key, t);
+    const age = Math.max(0, now - o.at);
+    const weight = halfLifeMs > 0 ? 0.5 ** (age / halfLifeMs) : 1;
+    const keys = [
+      `${o.modelId}|${o.kind}`,
+      `${o.modelId}|${o.kind}|${o.complexity}`,
+      o.projectScope
+        ? `${o.modelId}|${o.kind}|${o.complexity}|${o.projectScope}`
+        : undefined,
+    ];
+    for (const key of keys) {
+      if (!key) continue;
+      const t = tally.get(key) ?? { ok: 0, total: 0, weight: 0, okWeight: 0 };
+      t.total += 1;
+      t.weight += weight;
+      if (status === "verified_success") {
+        t.ok += 1;
+        t.okWeight += weight;
+      }
+      tally.set(key, t);
+    }
   }
   const signals: Record<string, RoutingSignal> = {};
   for (const [key, t] of tally) {
-    signals[key] = { successRate: t.ok / t.total, rejectRate: 0 };
+    signals[key] = {
+      successRate: t.weight > 0 ? t.okWeight / t.weight : t.ok / t.total,
+      rejectRate: 0,
+      sampleCount: t.total,
+      effectiveSampleSize: t.weight,
+    };
   }
   return signals;
 }
