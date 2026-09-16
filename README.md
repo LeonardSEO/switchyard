@@ -187,6 +187,16 @@ Users install only `@vepando/switchyard`. The repository remains a workspace int
 
 Switchyard is early-stage software. The held-out classifier evaluation is promising but still small, and the optional Codex execution path relies on an undocumented backend. The gateway falls back to API routing when that backend is unavailable. Treat routing decisions as an optimization aid, not a guarantee of model quality or availability.
 
+## Contributors
+
+Special thanks to [Tai Benvenuti (@taibenvenuti)](https://github.com/taibenvenuti),
+recognized as an **Early contributor — Routing & Reliability** for detailed
+technical reviews that strengthened classification, Pi/OMP routing contracts,
+admission handling, and outcome learning.
+
+See [CONTRIBUTORS.md](CONTRIBUTORS.md) for contributor acknowledgements and how
+to get involved.
+
 ## Development
 
 ```bash

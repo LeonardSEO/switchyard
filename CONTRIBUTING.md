@@ -5,6 +5,8 @@ so reports include the affected integration, version, reproduction, and routing
 impact. For substantial behavior changes, open an issue first so the routing
 contract and compatibility impact can be discussed. Report vulnerabilities
 privately through GitHub Security, as described in [SECURITY.md](SECURITY.md).
+Contributors whose sustained issues, reviews, tests, or code materially improve
+the project may be recognized in [CONTRIBUTORS.md](CONTRIBUTORS.md).
 
 ## Local development
 
