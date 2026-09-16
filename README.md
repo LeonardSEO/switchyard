@@ -211,4 +211,6 @@ Contributions are welcome; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-[Apache-2.0](LICENSE)
+Copyright 2026 Leonard van Hemert. Licensed under
+[Apache-2.0](LICENSE). Third-party attribution for the limited portions derived
+from veto is documented separately in [NOTICE](NOTICE).

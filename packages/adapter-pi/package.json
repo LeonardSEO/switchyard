@@ -45,7 +45,9 @@
     "dist",
     "extensions",
     "bin",
-    "README.md"
+    "README.md",
+    "LICENSE",
+    "NOTICE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.build.json"
