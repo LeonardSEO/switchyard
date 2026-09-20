@@ -30,6 +30,21 @@ export interface CompletionOptions {
   attribution?: Attribution;
 }
 
+export async function resolvePiOpenRouterAuth(
+  ctx: PiContextLike,
+  providerId = "openrouter",
+): Promise<ResolvedAuth> {
+  const result = await ctx.modelRegistry.getProviderAuth?.(providerId);
+  const registryKey =
+    result?.auth?.apiKey ??
+    (await ctx.modelRegistry.getApiKeyForProvider?.(providerId));
+  return {
+    apiKey: process.env.OPENROUTER_API_KEY ?? registryKey,
+    headers: result?.auth?.headers,
+    baseUrl: result?.auth?.baseUrl ?? "https://openrouter.ai/api/v1",
+  };
+}
+
 export function createPiCompletion(
   ctx: PiContextLike,
   opts: CompletionOptions = {},
@@ -40,15 +55,13 @@ export function createPiCompletion(
     // Our API catalog is OpenRouter ids, so that is the credential we need.
     // (Writing `a ?? b ? c : d` silently parses as `(a ?? b) ? c : d`.)
     const providerId = opts.providerId ?? "openrouter";
-    const result = await ctx.modelRegistry.getProviderAuth?.(providerId);
-    const apiKey =
-      result?.auth?.apiKey ??
-      (await ctx.modelRegistry.getApiKeyForProvider?.(providerId));
-    const baseUrl = (result?.auth?.baseUrl ?? "https://openrouter.ai/api/v1").replace(/\/$/, "");
+    const resolved = await resolvePiOpenRouterAuth(ctx, providerId);
+    const apiKey = resolved.apiKey;
+    const baseUrl = (resolved.baseUrl ?? "https://openrouter.ai/api/v1").replace(/\/$/, "");
 
     const headers: Record<string, string> = {
       "content-type": "application/json",
-      ...(result?.auth?.headers ?? {}),
+      ...(resolved.headers ?? {}),
       ...attributionHeaders(opts.attribution ?? {}),
     };
     if (apiKey) headers.authorization = `Bearer ${apiKey}`;

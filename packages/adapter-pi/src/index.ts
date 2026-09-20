@@ -1,4 +1,6 @@
 import {
+  DEFAULT_DECISION_CACHE_TTL_MS,
+  DecisionClassifier,
   effectiveInputPer1M,
   KeywordClassifier,
   ModelClassifier,
@@ -14,6 +16,10 @@ import {
   type RoutingSignal,
   type TaskSpec,
 } from "@vepando/switchyard-core";
+import {
+  createOpenRouterDecision,
+  OPENROUTER_JEV_LATEST,
+} from "@vepando/switchyard-provider-openrouter";
 import { createHash, randomUUID } from "node:crypto";
 import type { Snapshot } from "@vepando/switchyard-catalog";
 import { signalsFromCatalog } from "@vepando/switchyard-catalog";
@@ -25,7 +31,7 @@ import type {
 } from "./pi.js";
 import { matchPiModel } from "./pi.js";
 import { buildProjectContext } from "./project-context.js";
-import { createPiCompletion } from "./completion.js";
+import { createPiCompletion, resolvePiOpenRouterAuth } from "./completion.js";
 import {
   appendOutcome,
   judgeRunStatus,
@@ -148,6 +154,7 @@ export function createExtension(opts: AdapterOptions = {}) {
     // reused while the objective is still recognisably the same task.
     let lastObjective: string | undefined;
     let lastClassification: Classification | undefined;
+    let lastClassificationAt: number | undefined;
     let lastProjectContext: string | undefined;
     let classifierPromise: Promise<Classifier> | undefined;
     let cacheWritePromise: Promise<void> = Promise.resolve();
@@ -190,6 +197,7 @@ export function createExtension(opts: AdapterOptions = {}) {
           classifierPromise = undefined;
           lastObjective = undefined;
           lastClassification = undefined;
+          lastClassificationAt = undefined;
           lastProjectContext = undefined;
           projectContextPromises.clear();
           ctx.ui?.notify?.("Switchyard classification cache cleared.", "info");
@@ -271,45 +279,61 @@ export function createExtension(opts: AdapterOptions = {}) {
             ? candidates.find((m) => m.id === opts.classifierModel)
             : undefined;
           const chosen = pinned ?? picked;
-          if (!chosen) return new KeywordClassifier();
-          const backups = rankClassifierCandidates(
-            candidates,
-            {
-              ...defaultClassifierFloors,
-              minCapabilityScore: 0.5,
-              allowReasoning: true,
-              latencyMs: (m) => latencies[m.id],
-              avoid: (m) => failed[m.id] !== undefined,
-            },
-            // Five model candidates before a degraded keyword answer: a dead
-            // catalog entry must cost one round trip, not give up the rung.
-            5,
-          ).slice(1);
+          let fallbackClassifier: Classifier = new KeywordClassifier();
+          if (chosen) {
+            const backups = rankClassifierCandidates(
+              candidates,
+              {
+                ...defaultClassifierFloors,
+                minCapabilityScore: 0.5,
+                allowReasoning: true,
+                latencyMs: (m) => latencies[m.id],
+                avoid: (m) => failed[m.id] !== undefined,
+              },
+              // Five model candidates before a degraded keyword answer: a dead
+              // catalog entry must cost one round trip, not give up the rung.
+              5,
+            ).filter((model) => model.id !== chosen.id).slice(0, 4);
 
-          const cache = new Map(Object.entries(await loadCache(opts.cacheFile)));
-          const diskCache = {
-            get: (task: { kind?: string; objective: string }) =>
-              cache.get(ClassificationCache.key(task as never)),
-            set: (task: { kind?: string; objective: string }, value: Classification) => {
-              cache.set(ClassificationCache.key(task as never), value);
-              const snapshot = Object.fromEntries(cache);
-              cacheWritePromise = cacheWritePromise
-                .catch(() => undefined)
-                .then(() => saveCache(snapshot, opts.cacheFile));
-            },
-          };
+            const cache = new Map(Object.entries(await loadCache(opts.cacheFile)));
+            const diskCache = {
+              get: (task: { kind?: string; objective: string }) =>
+                cache.get(ClassificationCache.key(task as never)),
+              set: (task: { kind?: string; objective: string }, value: Classification) => {
+                cache.set(ClassificationCache.key(task as never), value);
+                const snapshot = Object.fromEntries(cache);
+                cacheWritePromise = cacheWritePromise
+                  .catch(() => undefined)
+                  .then(() => saveCache(snapshot, opts.cacheFile));
+              },
+            };
 
-          return new ModelClassifier({
-            models: candidates,
-            cache: diskCache as never,
-            complete: timedCompletion(ctx, chosen, opts.latencyFile, pinned ? [] : backups, opts.failureFile),
-            modelId: chosen.id,
-            // Measured on a held-out set: keyword 2/12, model 11/12. The rung
-            // decides every other decision, so it is worth one round trip —
-            // cached on disk, latency-tracked, and degrading to the keyword
-            // answer if the call fails.
+            fallbackClassifier = new ModelClassifier({
+              models: candidates,
+              cache: diskCache as never,
+              complete: timedCompletion(
+                ctx,
+                chosen,
+                opts.latencyFile,
+                pinned ? [] : backups,
+                opts.failureFile,
+              ),
+              modelId: chosen.id,
+              // The outer decision classifier owns the user's escalation
+              // policy. Reaching this layer means Jev already needs fallback.
+              escalation: "always",
+              minSavingsFactor: 0,
+            });
+          }
+
+          return new DecisionClassifier({
+            model: OPENROUTER_JEV_LATEST,
+            decide: createOpenRouterDecision({
+              resolveAuth: () => resolvePiOpenRouterAuth(ctx),
+            }),
+            fallback: fallbackClassifier,
             escalation: opts.escalation ?? "always",
-            minSavingsFactor: 0,
+            now,
           });
         })();
       }
@@ -399,10 +423,12 @@ export function createExtension(opts: AdapterOptions = {}) {
       const reuse =
         lastClassification &&
         lastObjective &&
+        lastClassificationAt !== undefined &&
+        now() - lastClassificationAt < DEFAULT_DECISION_CACHE_TTL_MS &&
         lastProjectContext === projectContext &&
         taskSimilarity(lastObjective, objective) >= threshold;
       if (reuse && lastClassification) {
-        classification = { ...lastClassification, source: "model" };
+        classification = { ...lastClassification };
       } else {
         classification = await getClassifier(ctx, snapshot).then((c) =>
           c.classify(task),
@@ -413,10 +439,12 @@ export function createExtension(opts: AdapterOptions = {}) {
         if (!classification.degraded) {
           lastObjective = objective;
           lastClassification = classification;
+          lastClassificationAt = now();
           lastProjectContext = projectContext;
         } else {
           lastObjective = undefined;
           lastClassification = undefined;
+          lastClassificationAt = undefined;
           lastProjectContext = undefined;
         }
       }

@@ -1,8 +1,9 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapacityState, ModelCapabilities } from "@vepando/switchyard-core";
+import { DEFAULT_DECISION_CACHE_TTL_MS } from "@vepando/switchyard-core";
 import {
   buildProjectContext,
   createExtension,
@@ -127,6 +128,46 @@ function fakeCtxWithAuth(auth: { apiKey?: string; baseUrl?: string }) {
     ui: { notify: () => {} },
   };
   return { ctx, captured };
+}
+
+function validJevResponse(
+  kind: string,
+  complexity: string,
+  confidence = 0.9,
+): Response {
+  return new Response(
+    JSON.stringify({
+      model: "typesafe/jev-1.13-20260917",
+      answers: {
+        task_kind: {
+          type: "choice",
+          choice: kind,
+          probabilities: { [kind]: confidence },
+          confidence,
+        },
+        task_complexity: {
+          type: "choice",
+          choice: complexity,
+          probabilities: { [complexity]: confidence },
+          confidence,
+        },
+      },
+      usage: { cost: 0.00001 },
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
+}
+
+function validChatResponse(kind = "code-change", complexity = "advanced"): Response {
+  return new Response(
+    JSON.stringify({
+      choices: [
+        { message: { content: JSON.stringify({ kind, complexity, confidence: 0.9 }) } },
+      ],
+      usage: { prompt_tokens: 100, completion_tokens: 20 },
+    }),
+    { status: 200, headers: { "content-type": "application/json" } },
+  );
 }
 
 const files: string[] = [];
@@ -560,6 +601,145 @@ describe("pi adapter", () => {
   });
 });
 
+describe("Jev-first classification", () => {
+  const models = [
+    classifierModel("cheap/classifier", 0.01, 0.55),
+    classifierModel("alternate/classifier", 0.02, 0.6),
+    classifierModel("frontier/large", 3, 0.8, "large"),
+  ];
+
+  function setup(options: Parameters<typeof createExtension>[0] = {}) {
+    const { ctx, captured } = fakeCtxWithAuth({
+      apiKey: "pi-key",
+      baseUrl: "https://openrouter.ai/api/v1",
+    });
+    ctx.modelRegistry.getAvailable = () =>
+      models.map((entry) => ({ id: entry.id, provider: "openrouter" }));
+    const { pi, handlers, calls } = fakePi([]);
+    createExtension({
+      loadSnapshot: async () => snapshotOf(models),
+      outcomeFile: tempFile(),
+      cacheFile: tempFile(),
+      latencyFile: tempFile(),
+      failureFile: tempFile(),
+      quiet: true,
+      ...options,
+    })(pi);
+    return { ctx, captured, handlers, calls };
+  }
+
+  it("uses Jev Decisions before the chat classifier with Pi credentials", async () => {
+    const { ctx, handlers } = setup();
+    const originalFetch = globalThis.fetch;
+    const requests: Array<{ url: string; headers: Record<string, string>; body: string }> = [];
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      requests.push({
+        url: String(url),
+        headers: init?.headers as Record<string, string>,
+        body: String(init?.body),
+      });
+      if (String(url).endsWith("/api/alpha/decisions")) {
+        return validJevResponse("code-change", "moderate", 0.88);
+      }
+      throw new Error(`unexpected fallback request: ${url}`);
+    }) as typeof fetch;
+
+    try {
+      await handlers.before_agent_start!({ prompt: "Add validation to the parser" }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.url).toBe("https://openrouter.ai/api/alpha/decisions");
+    expect(requests[0]?.headers.authorization).toBe("Bearer pi-key");
+    expect(JSON.parse(requests[0]?.body ?? "{}").model).toBe("typesafe/jev-latest");
+  });
+
+  it("uses the pinned classifier model only for the chat fallback", async () => {
+    const { ctx, handlers } = setup({ classifierModel: "alternate/classifier" });
+    const originalFetch = globalThis.fetch;
+    const bodies: unknown[] = [];
+    globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      if (String(url).endsWith("/api/alpha/decisions")) {
+        return new Response("", { status: 503 });
+      }
+      return validChatResponse();
+    }) as typeof fetch;
+
+    try {
+      await handlers.before_agent_start!({ prompt: "Implement the service retry policy" }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(bodies).toHaveLength(2);
+    expect((bodies[0] as { model: string }).model).toBe("typesafe/jev-latest");
+    expect((bodies[1] as { model: string }).model).toBe("alternate/classifier");
+  });
+
+  it("falls through Jev and chat failures to local classification", async () => {
+    const { ctx, handlers, calls } = setup();
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async () => new Response("", { status: 503 })) as typeof fetch;
+
+    try {
+      await handlers.before_agent_start!({ prompt: "Implement the service retry policy" }, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(calls.model).toBeDefined();
+  });
+
+  it("makes no classifier request in offline mode or for fully explicit tasks", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchFn = vi.fn<typeof fetch>();
+    globalThis.fetch = fetchFn;
+    try {
+      const offline = setup({ escalation: "never" });
+      await offline.handlers.before_agent_start!(
+        { prompt: "Add validation to the parser" },
+        offline.ctx,
+      );
+
+      const explicit = setup({
+        buildTaskSpec: () => ({ kind: "review", complexity: "simple" }),
+      });
+      await explicit.handlers.before_agent_start!(
+        { prompt: "Assess the parser change" },
+        explicit.ctx,
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it("expires same-session classification reuse after six hours", async () => {
+    let now = 1_000;
+    const { ctx, handlers } = setup({ now: () => now });
+    const originalFetch = globalThis.fetch;
+    const fetchFn = vi.fn(async () => validJevResponse("code-change", "advanced"));
+    globalThis.fetch = fetchFn as typeof fetch;
+    const event = { prompt: "Add OpenTelemetry tracing across the HTTP worker layers" };
+
+    try {
+      await handlers.before_agent_start!(event, ctx);
+      now += DEFAULT_DECISION_CACHE_TTL_MS - 1;
+      await handlers.before_agent_start!(event, ctx);
+      now += 2;
+      await handlers.before_agent_start!(event, ctx);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+});
+
 describe("classifier escalation", () => {
   const uncertain = "implement service";
   const certain = "create a simple hello world page";
@@ -751,15 +931,7 @@ describe("escalation policy", () => {
     globalThis.fetch = (async (_url: unknown, init: unknown) => {
       called += 1;
       captured.body = (init as { body: string }).body;
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [
-            { message: { content: '{"kind":"code-change","complexity":"complex","confidence":0.9}' } },
-          ],
-        }),
-      } as unknown as Response;
+      return validJevResponse("code-change", "complex", 0.9);
     }) as typeof fetch;
     try {
       createExtension({
@@ -780,7 +952,7 @@ describe("escalation policy", () => {
       globalThis.fetch = originalFetch;
     }
     expect(called).toBe(1);
-    expect(captured.body).toContain("cheap/classifier");
+    expect(captured.body).toContain("typesafe/jev-latest");
   });
 });
 
@@ -793,13 +965,7 @@ describe("task similarity", () => {
     let calls = 0;
     globalThis.fetch = (async () => {
       calls += 1;
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [{ message: { content: '{"kind":"code-change","complexity":"advanced"}' } }],
-        }),
-      } as unknown as Response;
+      return validJevResponse("code-change", "advanced");
     }) as typeof fetch;
     try {
       createExtension({
@@ -839,13 +1005,7 @@ describe("task similarity", () => {
     let calls = 0;
     globalThis.fetch = (async () => {
       calls += 1;
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          choices: [{ message: { content: '{"kind":"code-change","complexity":"advanced"}' } }],
-        }),
-      } as unknown as Response;
+      return validJevResponse("code-change", "advanced");
     }) as typeof fetch;
     try {
       createExtension({
