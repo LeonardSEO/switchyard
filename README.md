@@ -94,8 +94,15 @@ Use `http://127.0.0.1:8787/v1` as the OpenAI-compatible base URL and select `swi
 ## How routing works
 
 ```text
-request + compact project context -> classify -> filter -> score expected cost -> select model + effort
+request + compact project context -> explicit constraints -> Jev -> chat fallback -> local fallback -> filter -> score expected cost -> select model + effort
 ```
+
+By default, Switchyard asks [`typesafe/jev-latest`](https://openrouter.ai/~typesafe/jev-latest)
+to classify the task kind and complexity through OpenRouter Decisions. Explicit
+caller constraints still win. A malformed, unavailable, or low-confidence Jev
+answer falls back to the existing chat classifier and then to the local keyword
+classifier. Jev only makes the routing decision: it is never selected to execute
+code, call tools, or replace the host agent loop.
 
 | Level | Typical work | Reasoning effort |
 |---|---|---|
@@ -136,7 +143,7 @@ All options are optional.
 | Option | Purpose |
 |---|---|
 | `escalation` | `always` (default), `uncertain`, or `never`; use `never` to keep classification local |
-| `classifierModel` | Pin the model used to classify tasks |
+| `classifierModel` | Pin the fallback chat-classifier model used when Jev is unavailable or its answer is rejected |
 | `reuseSimilarity` | Control when a previous task classification may be reused; default `0.6` |
 | `projectContext` | Pi: `auto` (default) or `none`; disable repository context while keeping model classification |
 | `snapshotFreshnessMs` | Pi/OMP catalog and Codex-capacity refresh interval; default 10 minutes |
@@ -147,6 +154,8 @@ All options are optional.
 | `preferPaidCapacityFactor` | Control how much worse subscription capacity may score and still win; default `2` |
 | `SWITCHYARD_PORT` | Gateway port; default `8787` |
 | `SWITCHYARD_ESCALATION` | Gateway equivalent of the `escalation` option |
+| `SWITCHYARD_CLASSIFIER_MODEL` | Gateway equivalent of `classifierModel` |
+| `SWITCHYARD_DECISIONS_BASE_URL` | Optional OpenRouter-compatible Decisions endpoint; the default is OpenRouter's alpha Decisions endpoint |
 | `SWITCHYARD_ROUTING_SCOPE` | Pi/OMP equivalent of `routingScope`; set `selected-model` for opt-in routing |
 
 Pi and OMP record ordinary agent-loop completion as telemetry, not as proof that
@@ -159,15 +168,16 @@ least three verified outcomes, otherwise routing falls back to broader history.
 
 ## Privacy and security
 
-In Pi and OMP, classification sends the latest user objective (up to 4,000 characters)
-plus a compact project profile (up to 16,000 characters). The profile contains
-the repository name, a shallow file tree, safe manifest metadata such as package
+In Pi and OMP, default remote classification sends the latest user objective
+(up to 4,000 characters) plus a compact project profile (up to 16,000
+characters) through OpenRouter to the Jev provider. The profile contains the
+repository name, a shallow file tree, safe manifest metadata such as package
 and script names, and project context files available to the host or discovered
-locally, such as `AGENTS.md` or `CLAUDE.md`. It does not send source-file contents or conversation
-history. Missing manifests or instruction files are simply omitted. Context
-files can contain private project information; review them before enabling a
-remote classifier, use `projectContext: "none"` to exclude them, or set
-`escalation: "never"` to keep all classification local.
+locally, such as `AGENTS.md` or `CLAUDE.md`. It does not send source-file
+contents or conversation history. Missing manifests or instruction files are
+simply omitted. Context files can contain private project information; review
+them before enabling a remote classifier, use `projectContext: "none"` to
+exclude them, or set `escalation: "never"` to keep all classification local.
 
 Outcome records stay local in `~/.switchyard/outcomes.jsonl`. Project-specific
 learning stores a truncated hash of the project root, never the path itself.
@@ -178,6 +188,14 @@ provider still receives the conversation and tool data that the client sends
 for the actual completion.
 
 Set `escalation: "never"` to disable model-based classification. Credentials remain in the host or environment and are not written into Switchyard configuration. Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
+
+OpenRouter Decisions is an alpha API, and `typesafe/jev-latest` is a moving
+alias. Switchyard validates every returned answer and keeps both chat and local
+fallbacks; a typed response is not treated as a guarantee that the
+classification is correct. For protocol details, see the
+[OpenRouter Decisions API](https://openrouter.ai/docs/api/api-reference/alphadecisions/submit-a-decisions-questions-and-answers-request),
+[TypeSafe System One](https://docs.typesafe.ai/concepts/system-one), and
+[TypeSafe primitives](https://docs.typesafe.ai/primitives).
 
 ## Package architecture
 
