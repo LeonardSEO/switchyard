@@ -34,6 +34,7 @@ import {
 } from "@vepando/switchyard-provider-openrouter";
 import {
   classifierEvalCacheKey,
+  classifierEvalCachedModelId,
   parseClassifierEvalArgs,
   summarizeClassifierResults,
   type ClassifierEvalBackend,
@@ -222,8 +223,7 @@ async function buildChatClassifier(asFallback: boolean): Promise<Classifier> {
 }
 
 function cachedChatModel(entries: Record<string, string>): ModelCapabilities {
-  const legacyKey = Object.keys(entries).find((key) => !key.startsWith("{"));
-  const id = legacyKey?.split("|", 1)[0] || "cached/chat-classifier";
+  const id = classifierEvalCachedModelId(entries, "chat") ?? "cached/chat-classifier";
   return {
     id,
     provider: "openrouter",

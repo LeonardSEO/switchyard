@@ -156,6 +156,8 @@ export function createExtension(opts: AdapterOptions = {}) {
     let lastClassification: Classification | undefined;
     let lastClassificationAt: number | undefined;
     let lastProjectContext: string | undefined;
+    let lastExplicitKind: TaskSpec["kind"];
+    let lastExplicitComplexity: TaskSpec["complexity"];
     let classifierPromise: Promise<Classifier> | undefined;
     let cacheWritePromise: Promise<void> = Promise.resolve();
     const projectContextPromises = new Map<string, Promise<string>>();
@@ -199,6 +201,8 @@ export function createExtension(opts: AdapterOptions = {}) {
           lastClassification = undefined;
           lastClassificationAt = undefined;
           lastProjectContext = undefined;
+          lastExplicitKind = undefined;
+          lastExplicitComplexity = undefined;
           projectContextPromises.clear();
           ctx.ui?.notify?.("Switchyard classification cache cleared.", "info");
         } catch (error) {
@@ -426,6 +430,8 @@ export function createExtension(opts: AdapterOptions = {}) {
         lastClassificationAt !== undefined &&
         now() - lastClassificationAt < DEFAULT_DECISION_CACHE_TTL_MS &&
         lastProjectContext === projectContext &&
+        lastExplicitKind === task.kind &&
+        lastExplicitComplexity === task.complexity &&
         taskSimilarity(lastObjective, objective) >= threshold;
       if (reuse && lastClassification) {
         classification = { ...lastClassification };
@@ -441,11 +447,15 @@ export function createExtension(opts: AdapterOptions = {}) {
           lastClassification = classification;
           lastClassificationAt = now();
           lastProjectContext = projectContext;
+          lastExplicitKind = task.kind;
+          lastExplicitComplexity = task.complexity;
         } else {
           lastObjective = undefined;
           lastClassification = undefined;
           lastClassificationAt = undefined;
           lastProjectContext = undefined;
+          lastExplicitKind = undefined;
+          lastExplicitComplexity = undefined;
         }
       }
       const outcomes = await readOutcomes(opts.outcomeFile);

@@ -1,5 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { CapacityState, ModelCapabilities } from "@vepando/switchyard-core";
@@ -13,6 +20,7 @@ import {
   readOutcomes,
   signalsFromOutcomes,
 } from "../src/index";
+import { createPiCompletion } from "../src/completion";
 import type { PiApiLike, PiContextLike, PiModelLike } from "../src/pi";
 
 const model = (
@@ -737,6 +745,66 @@ describe("Jev-first classification", () => {
     }
 
     expect(fetchFn).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not reuse a classification across changed explicit constraints", async () => {
+    let complexity: "simple" | "frontier" = "simple";
+    const { ctx, handlers, calls } = setup({
+      buildTaskSpec: () => ({ kind: "code-change", complexity }),
+    });
+    const originalFetch = globalThis.fetch;
+    const fetchFn = vi.fn<typeof fetch>();
+    globalThis.fetch = fetchFn;
+
+    try {
+      const event = { prompt: "Implement the requested parser change" };
+      await handlers.before_agent_start!(event, ctx);
+      const firstLevel = calls.level;
+      complexity = "frontier";
+      await handlers.before_agent_start!(event, ctx);
+
+      expect(calls.level).not.toBe(firstLevel);
+      expect(calls.level).toBe("xhigh");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+});
+
+describe("classifier diagnostics", () => {
+  it("does not write upstream response bodies to the debug log", async () => {
+    const root = tempDirectory();
+    const previousHome = process.env.HOME;
+    const previousDebug = process.env.SWITCHYARD_DEBUG;
+    process.env.HOME = root;
+    process.env.SWITCHYARD_DEBUG = "1";
+    const { ctx } = fakeCtxWithAuth({
+      apiKey: "pi-key",
+      baseUrl: "https://openrouter.ai/api/v1",
+    });
+    const secret = "private-upstream-response-content";
+    const complete = createPiCompletion(ctx, {
+      fetchFn: vi.fn(async () => validChatResponse(secret, "simple")),
+    });
+
+    try {
+      await complete({
+        model: classifierModel("cheap/classifier", 0.01, 0.55),
+        system: "Classify this task.",
+        user: "Implement a small parser fix.",
+        maxOutputTokens: 100,
+      });
+    } finally {
+      if (previousHome === undefined) delete process.env.HOME;
+      else process.env.HOME = previousHome;
+      if (previousDebug === undefined) delete process.env.SWITCHYARD_DEBUG;
+      else process.env.SWITCHYARD_DEBUG = previousDebug;
+    }
+
+    const log = readFileSync(join(root, ".switchyard", "debug.log"), "utf8");
+    expect(log).not.toContain(secret);
   });
 });
 

@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   classifierEvalCacheKey,
+  classifierEvalCachedModelId,
   parseClassifierEvalArgs,
   summarizeClassifierResults,
 } from "./classifier-eval-lib.js";
@@ -41,6 +42,24 @@ describe("classifier evaluation records", () => {
   it("namespaces cache entries by schema, backend, model, and input", () => {
     expect(classifierEvalCacheKey("jev", "typesafe/jev-latest", "same input"))
       .not.toBe(classifierEvalCacheKey("chat", "typesafe/jev-latest", "same input"));
+  });
+
+  it("recovers the chat model from a namespaced cache for offline replay", () => {
+    const key = classifierEvalCacheKey(
+      "chat",
+      "provider/recorded-classifier",
+      "cached prompt",
+    );
+
+    expect(
+      classifierEvalCachedModelId(
+        {
+          "provider/legacy-classifier|old prompt": "old response",
+          [key]: "cached response",
+        },
+        "chat",
+      ),
+    ).toBe("provider/recorded-classifier");
   });
 
   it("reports accuracy, underclassification, fallback, latency, and cost", () => {

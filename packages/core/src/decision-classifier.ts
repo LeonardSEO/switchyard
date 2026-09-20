@@ -148,6 +148,8 @@ export class DecisionClassifier implements Classifier {
     try {
       return {
         ...(await this.options.fallback.classify(task)),
+        ...(task.kind === undefined ? {} : { kind: task.kind }),
+        ...(task.complexity === undefined ? {} : { complexity: task.complexity }),
         degraded: true,
         fallbackFrom: "jev",
         fallbackReason: reason,

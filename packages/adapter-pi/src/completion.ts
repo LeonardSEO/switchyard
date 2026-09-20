@@ -92,8 +92,7 @@ export function createPiCompletion(
         }),
       });
       if (!res.ok) {
-        const detail = await res.text().catch(() => "");
-        await debug(`classifier ${res.status} ${detail.slice(0, 300)}`);
+        await debug(`classifier response: status=${res.status}`);
         throw new Error(`classifier call failed: ${res.status}`);
       }
       const body = (await res.json()) as {
@@ -101,7 +100,9 @@ export function createPiCompletion(
         usage?: { prompt_tokens?: number; completion_tokens?: number };
       };
       const text = body.choices?.[0]?.message?.content ?? "";
-      await debug(`classifier response: ${JSON.stringify(body).slice(0, 400)}`);
+      await debug(
+        `classifier response: status=${res.status} prompt_tokens=${body.usage?.prompt_tokens ?? "unknown"} completion_tokens=${body.usage?.completion_tokens ?? "unknown"}`,
+      );
       const costUsd = costOf(req.model, body.usage);
       return { text, costUsd };
     } catch (err) {

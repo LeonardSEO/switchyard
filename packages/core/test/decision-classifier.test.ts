@@ -168,6 +168,29 @@ describe("DecisionClassifier", () => {
     });
   });
 
+  it("keeps explicit fields authoritative when the fallback disagrees", async () => {
+    const result = await createClassifier({
+      decide: async () => {
+        throw new Error("Jev unavailable");
+      },
+      fallback: fixedClassifier({
+        kind: "code-change",
+        complexity: "frontier",
+        confidence: 0.7,
+        source: "model",
+      }),
+    }).classify({
+      objective: "Assess this patch",
+      kind: "review",
+    });
+
+    expect(result).toMatchObject({
+      kind: "review",
+      complexity: "frontier",
+      fallbackFrom: "jev",
+    });
+  });
+
   it("keeps classification local when escalation is never", async () => {
     const decide = vi.fn<DecisionFn>();
     const result = await createClassifier({ decide, escalation: "never" }).classify(task);

@@ -39,6 +39,30 @@ export function classifierEvalCacheKey(
   });
 }
 
+export function classifierEvalCachedModelId(
+  entries: Record<string, string>,
+  backend: Exclude<ClassifierEvalBackend, "keyword">,
+): string | undefined {
+  let legacyChatModel: string | undefined;
+  for (const key of Object.keys(entries)) {
+    try {
+      const parsed = JSON.parse(key) as Record<string, unknown>;
+      if (
+        parsed.schema === CLASSIFIER_EVAL_SCHEMA_VERSION &&
+        parsed.backend === backend &&
+        typeof parsed.model === "string"
+      ) {
+        return parsed.model;
+      }
+    } catch {
+      if (backend === "chat" && !key.startsWith("{")) {
+        legacyChatModel ??= key.split("|", 1)[0] || undefined;
+      }
+    }
+  }
+  return legacyChatModel;
+}
+
 export interface ClassifierEvalResult {
   expectedKind: TaskKind;
   expectedComplexity: Complexity;
