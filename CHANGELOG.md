@@ -2,6 +2,12 @@
 
 Notable changes to Switchyard are documented here.
 
+## 0.4.1 - 2026-09-20
+
+### Fixed
+
+- Preserve the executable mode of the `switchyard-gateway` binary so npm keeps the CLI mapping during publication.
+
 ## 0.4.0 - 2026-09-20
 
 ### Added

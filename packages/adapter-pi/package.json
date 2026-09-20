@@ -1,5 +1,5 @@
 {
-  "version": "0.4.0",
+  "version": "0.4.1",
   "license": "Apache-2.0",
   "type": "module",
   "author": "LeonardSEO",
@@ -39,7 +39,7 @@
     }
   },
   "bin": {
-    "switchyard-gateway": "./bin/switchyard-gateway.js"
+    "switchyard-gateway": "bin/switchyard-gateway.js"
   },
   "files": [
     "dist",

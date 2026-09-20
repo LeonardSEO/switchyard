@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -8,6 +8,7 @@ interface ExtensionManifest {
 
 interface PackageManifest {
   name?: string;
+  bin?: Record<string, string>;
   pi?: ExtensionManifest;
   omp?: ExtensionManifest;
 }
@@ -45,6 +46,12 @@ describe("coding-agent package manifests", () => {
     ) as PackageManifest;
     expect(pluginManifest.name).toBe("@vepando/switchyard");
     expect(pluginManifest.omp?.extensions).toEqual(["./extensions"]);
+  });
+
+  it("publishes an executable gateway binary", () => {
+    expect(manifest.bin?.["switchyard-gateway"]).toBe("bin/switchyard-gateway.js");
+    const mode = statSync(resolve(packageRoot, "bin", "switchyard-gateway.js")).mode;
+    expect(mode & 0o111).not.toBe(0);
   });
 });
 
