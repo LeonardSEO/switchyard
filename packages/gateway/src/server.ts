@@ -2,20 +2,26 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { Readable } from "node:stream";
 import {
   defaultClassifierFloors,
+  DecisionClassifier,
+  KeywordClassifier,
   keywordClassification,
   rankClassifierCandidates,
   ModelClassifier,
-  pickCheapestClassifier,
   route,
   type Classification,
   type Classifier,
+  type DecisionFn,
   attributionHeaders,
   type Attribution,
   type CapacityState,
   type ModelCapabilities,
 } from "@vepando/switchyard-core";
 import { buildSnapshot, executeCodexRequest } from "@vepando/switchyard-catalog";
-import { createOpenRouterCompletion } from "@vepando/switchyard-provider-openrouter";
+import {
+  createOpenRouterCompletion,
+  createOpenRouterDecision,
+  OPENROUTER_JEV_LATEST,
+} from "@vepando/switchyard-provider-openrouter";
 import {
   extractObjective,
   modelList,
@@ -30,6 +36,12 @@ export interface GatewayOptions {
   /** Upstream for executed requests. Defaults to OpenRouter. */
   upstreamBaseUrl?: string;
   apiKey?: string;
+  /** Pin only the chat-model fallback used when Jev cannot classify. */
+  classifierModel?: string;
+  /** Compatible OpenRouter Decisions endpoint override. */
+  decisionsBaseUrl?: string;
+  /** Inject the decision transport for tests or embedding. */
+  decisionFn?: DecisionFn;
   /** Skip AI classification and use the deterministic path. */
   escalation?: "always" | "uncertain" | "never";
   freshnessMs?: number;
@@ -69,13 +81,82 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
   let capacity: Record<string, CapacityState> = {};
   let classifier: Classifier | undefined;
 
+  const buildClassifier = (available: ModelCapabilities[]): Classifier => {
+    const keyword = new KeywordClassifier();
+    const escalation = opts.escalation ?? "always";
+    if (escalation === "never") return keyword;
+
+    const api = available.filter((model) => model.pricing.kind === "api");
+    const floors = {
+      ...defaultClassifierFloors,
+      minCapabilityScore: 0.5,
+      allowReasoning: true,
+    };
+    const ranked = rankClassifierCandidates(api, floors, 5);
+    const pinned = opts.classifierModel
+      ? api.find((model) => model.id === opts.classifierModel)
+      : undefined;
+    const picked = pinned ?? ranked[0];
+    let fallback: Classifier = keyword;
+
+    if (picked) {
+      const ordered = [picked, ...ranked.filter((model) => model.id !== picked.id)];
+      const transport = createOpenRouterCompletion({
+        apiKey: opts.apiKey,
+        baseUrl: upstream,
+        attribution: opts.attribution,
+      });
+      const complete = async (request: Parameters<typeof transport>[0]) => {
+        let lastError: unknown;
+        for (const candidate of ordered) {
+          try {
+            return await transport({ ...request, model: candidate });
+          } catch (error) {
+            lastError = error;
+          }
+        }
+        throw lastError instanceof Error
+          ? lastError
+          : new Error("classifier unavailable");
+      };
+      fallback = new ModelClassifier({
+        models: api,
+        modelId: picked.id,
+        complete,
+        escalation: "always",
+        minSavingsFactor: 0,
+      });
+    }
+
+    const decide =
+      opts.decisionFn ??
+      (opts.models && !opts.decisionsBaseUrl
+        ? undefined
+        : createOpenRouterDecision({
+            apiKey: opts.apiKey,
+            baseUrl: upstream,
+            decisionsBaseUrl: opts.decisionsBaseUrl,
+            appUrl: opts.attribution?.referer,
+            appTitle: opts.attribution?.title,
+          }));
+    if (!decide) return keyword;
+
+    return new DecisionClassifier({
+      model: OPENROUTER_JEV_LATEST,
+      decide,
+      fallback,
+      escalation,
+      now,
+    });
+  };
+
   const refresh = async (force = false) => {
     if (!force && models.length > 0 && now() - loadedAt < freshnessMs) return;
     if (opts.models) {
       models = opts.models;
       capacity = opts.capacity ?? {};
       loadedAt = now();
-      classifier = undefined;
+      classifier = buildClassifier(models);
       return;
     }
     const snapshot = await buildSnapshot();
@@ -83,41 +164,7 @@ export async function createGateway(opts: GatewayOptions = {}): Promise<Gateway>
     capacity = snapshot.capacity;
     loadedAt = now();
 
-    const api = models.filter((m) => m.pricing.kind === "api");
-    const floors = {
-      ...defaultClassifierFloors,
-      // Below ~0.5 models guess instead of following the schema, and the rung
-      // decides everything downstream.
-      minCapabilityScore: 0.5,
-      allowReasoning: true,
-    };
-    const ranked = rankClassifierCandidates(api, floors, 5);
-    const picked = ranked[0];
-    const transport = createOpenRouterCompletion({ apiKey: opts.apiKey });
-    // Fall through to the next candidate on failure: one dead catalog entry
-    // must not cost every request its classification.
-    const complete = ranked.length > 1
-      ? async (req: Parameters<typeof transport>[0]) => {
-          let lastError: unknown;
-          for (const candidate of ranked) {
-            try {
-              return await transport({ ...req, model: candidate });
-            } catch (err) {
-              lastError = err;
-            }
-          }
-          throw lastError instanceof Error ? lastError : new Error("classifier unavailable");
-        }
-      : transport;
-    classifier = picked
-      ? new ModelClassifier({
-          models: api,
-          modelId: picked.id,
-          complete,
-          escalation: opts.escalation ?? "always",
-          minSavingsFactor: 0,
-        })
-      : undefined;
+    classifier = buildClassifier(models);
   };
 
   const classify = async (objective: string): Promise<Classification> => {

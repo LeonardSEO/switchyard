@@ -1,6 +1,10 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createServer, type Server } from "node:http";
-import type { ModelCapabilities } from "@vepando/switchyard-core";
+import type {
+  DecisionRequest,
+  DecisionResponse,
+  ModelCapabilities,
+} from "@vepando/switchyard-core";
 import { createGateway } from "../src/index.js";
 import { extractObjective, modelList, requiresApiExecution, rewriteRequest } from "../src/index.js";
 
@@ -23,6 +27,55 @@ const pool = [
   model("mid/flash", 0.15, 0.71),
   model("frontier/large", 3, 0.8),
 ];
+
+function decisionResponse(
+  request: DecisionRequest,
+  kind: string,
+  complexity: string,
+  confidence = 0.9,
+): DecisionResponse {
+  const answers: DecisionResponse["answers"] = {};
+  if (request.questions.task_kind) {
+    answers.task_kind = {
+      type: "choice",
+      choice: kind,
+      probabilities: { [kind]: confidence },
+      confidence,
+    };
+  }
+  if (request.questions.task_complexity) {
+    answers.task_complexity = {
+      type: "choice",
+      choice: complexity,
+      probabilities: { [complexity]: confidence },
+      confidence,
+    };
+  }
+  return { model: "typesafe/jev-1.13-20260917", answers };
+}
+
+async function explain(
+  target: Awaited<ReturnType<typeof createGateway>>,
+  objective: string,
+  fetchFn: typeof fetch = fetch,
+): Promise<{ model: string | null; complexity: string; classifier: string }> {
+  const response = await fetchFn(
+    `http://127.0.0.1:${target.port}/v1/chat/completions?explain=1`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        model: "switchyard/auto",
+        messages: [{ role: "user", content: objective }],
+      }),
+    },
+  );
+  return response.json() as Promise<{
+    model: string | null;
+    complexity: string;
+    classifier: string;
+  }>;
+}
 
 describe("gateway routing helpers", () => {
   it("takes the objective from the last user message", () => {
@@ -139,6 +192,131 @@ describe("gateway server", () => {
       body: JSON.stringify({ model: "switchyard/auto", messages: [{ role: "user", content: "do something" }] }),
     });
     expect(res.status).toBe(503);
+  });
+});
+
+describe("Jev-first gateway classification", () => {
+  it("routes from an injected Jev classification", async () => {
+    const decisionFn = vi.fn(async (request: DecisionRequest) =>
+      decisionResponse(request, "code-change", "advanced", 0.9),
+    );
+    gateway = await createGateway({ models: pool, decisionFn });
+
+    const result = await explain(gateway, "Implement cross-package retries");
+
+    expect(decisionFn).toHaveBeenCalledOnce();
+    expect(result).toMatchObject({
+      model: "mid/flash",
+      complexity: "advanced",
+      classifier: "jev",
+    });
+  });
+
+  it("uses the pinned chat classifier only after Jev fails", async () => {
+    const originalFetch = globalThis.fetch;
+    const bodies: Array<{ model: string }> = [];
+    globalThis.fetch = vi.fn(async (_url, init) => {
+      bodies.push(JSON.parse(String(init?.body)) as { model: string });
+      return new Response(
+        JSON.stringify({
+          choices: [
+            {
+              message: {
+                content: '{"kind":"code-change","complexity":"advanced","confidence":0.9}',
+              },
+            },
+          ],
+          usage: { prompt_tokens: 100, completion_tokens: 20 },
+        }),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+    gateway = await createGateway({
+      models: pool,
+      apiKey: "test-key",
+      classifierModel: "mid/flash",
+      decisionFn: async () => {
+        throw new Error("Jev unavailable");
+      },
+    });
+
+    try {
+      const result = await explain(gateway, "Implement cross-package retries", originalFetch);
+      expect(result.classifier).toBe("model");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(bodies).toHaveLength(1);
+    expect(bodies[0]?.model).toBe("mid/flash");
+  });
+
+  it("falls through Jev and chat failures to keyword classification", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => new Response("", { status: 503 })) as typeof fetch;
+    gateway = await createGateway({
+      models: pool,
+      apiKey: "test-key",
+      decisionFn: async () => {
+        throw new Error("Jev unavailable");
+      },
+    });
+
+    try {
+      const result = await explain(gateway, "Implement cross-package retries", originalFetch);
+      expect(result.classifier).toBe("keyword");
+      expect(result.model).toBeTruthy();
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("makes no remote classifier call when escalation is never", async () => {
+    const decisionFn = vi.fn();
+    const originalFetch = globalThis.fetch;
+    const remoteFetch = vi.fn<typeof fetch>();
+    globalThis.fetch = remoteFetch;
+    gateway = await createGateway({
+      models: pool,
+      escalation: "never",
+      decisionFn,
+    });
+
+    try {
+      const result = await explain(gateway, "Implement cross-package retries", originalFetch);
+      expect(result.classifier).toBe("keyword");
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(decisionFn).not.toHaveBeenCalled();
+    expect(remoteFetch).not.toHaveBeenCalled();
+  });
+
+  it("uses an explicit compatible Decisions endpoint", async () => {
+    const originalFetch = globalThis.fetch;
+    const urls: string[] = [];
+    globalThis.fetch = vi.fn(async (url, init) => {
+      urls.push(String(url));
+      const request = JSON.parse(String(init?.body)) as DecisionRequest;
+      return new Response(
+        JSON.stringify(decisionResponse(request, "review", "simple")),
+        { status: 200, headers: { "content-type": "application/json" } },
+      );
+    }) as typeof fetch;
+    gateway = await createGateway({
+      models: pool,
+      apiKey: "test-key",
+      decisionsBaseUrl: "https://decisions.example.test/v2/classify",
+    });
+
+    try {
+      await explain(gateway, "Review this parser patch", originalFetch);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(urls).toEqual(["https://decisions.example.test/v2/classify"]);
   });
 });
 
