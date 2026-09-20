@@ -2,6 +2,26 @@
 
 Notable changes to Switchyard are documented here.
 
+## 0.4.0 - 2026-09-20
+
+### Added
+
+- Use `typesafe/jev-latest` through OpenRouter Decisions as the primary remote task classifier in Pi, OMP, OpenCode, and the standalone gateway.
+- Add deterministic Jev, chat, and keyword classifier evaluation backends with a balanced 24-case English held-out corpus.
+- Support compatible Decisions endpoints through `SWITCHYARD_DECISIONS_BASE_URL`.
+
+### Changed
+
+- Fall back from Jev to the existing chat classifier and then to local keyword classification.
+- Cache accepted Jev decisions for six hours and bypass repeated upstream failures during a one-minute cooldown.
+- Keep `classifierModel` as an override for the fallback chat classifier.
+
+### Fixed
+
+- Preserve explicit task kind and complexity constraints through classification fallbacks and same-session reuse.
+- Exclude models explicitly marked as lacking text output from execution routing.
+- Avoid writing raw classifier response bodies to debug logs.
+
 ## 0.3.6 - 2026-09-16
 
 ### Fixed
