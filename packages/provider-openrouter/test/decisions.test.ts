@@ -48,7 +48,10 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 describe("OpenRouter Decisions transport", () => {
   it("posts the moving Jev alias to OpenRouter Decisions", async () => {
-    const fetchFn = vi.fn(async () => jsonResponse(successBody()));
+    const fetchFn = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        jsonResponse(successBody()),
+    );
     const decide = createOpenRouterDecision({ apiKey: "test-key", fetchFn });
 
     const result = await decide(oneQuestionRequest());
@@ -66,7 +69,10 @@ describe("OpenRouter Decisions transport", () => {
   });
 
   it("sends bearer authentication and protected attribution headers", async () => {
-    const fetchFn = vi.fn(async () => jsonResponse(successBody()));
+    const fetchFn = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        jsonResponse(successBody()),
+    );
     await createOpenRouterDecision({
       apiKey: "secret-test-key",
       appUrl: "https://example.test/switchyard",
@@ -91,7 +97,10 @@ describe("OpenRouter Decisions transport", () => {
   });
 
   it("uses asynchronously resolved credentials and base URL", async () => {
-    const fetchFn = vi.fn(async () => jsonResponse(successBody()));
+    const fetchFn = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        jsonResponse(successBody()),
+    );
     const resolveAuth = vi.fn(async () => ({
       apiKey: "resolved-key",
       baseUrl: "https://proxy.example.test/api/v1/",
@@ -113,7 +122,10 @@ describe("OpenRouter Decisions transport", () => {
   });
 
   it("uses an explicit Decisions endpoint unchanged", async () => {
-    const fetchFn = vi.fn(async () => jsonResponse(successBody()));
+    const fetchFn = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        jsonResponse(successBody()),
+    );
     await createOpenRouterDecision({
       apiKey: "test-key",
       decisionsBaseUrl: "https://decisions.example.test/custom",
@@ -124,7 +136,10 @@ describe("OpenRouter Decisions transport", () => {
   });
 
   it("derives the alpha endpoint from a standard API v1 base URL", async () => {
-    const fetchFn = vi.fn(async () => jsonResponse(successBody()));
+    const fetchFn = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        jsonResponse(successBody()),
+    );
     await createOpenRouterDecision({
       apiKey: "test-key",
       baseUrl: "https://openrouter-proxy.test/api/v1",
@@ -137,7 +152,10 @@ describe("OpenRouter Decisions transport", () => {
   });
 
   it("does not guess a Decisions path for an unrelated custom base URL", async () => {
-    const fetchFn = vi.fn(async () => jsonResponse(successBody()));
+    const fetchFn = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        jsonResponse(successBody()),
+    );
     await createOpenRouterDecision({
       apiKey: "test-key",
       baseUrl: "https://completion-proxy.test/custom",
@@ -174,7 +192,10 @@ describe("OpenRouter Decisions transport", () => {
   });
 
   it("rejects non-success HTTP responses without exposing their body", async () => {
-    const fetchFn = vi.fn(async () => jsonResponse({ secret: "do not expose" }, 429));
+    const fetchFn = vi.fn(
+      async (_input: string | URL | Request, _init?: RequestInit) =>
+        jsonResponse({ secret: "do not expose" }, 429),
+    );
     const decide = createOpenRouterDecision({ apiKey: "test-key", fetchFn });
 
     await expect(decide(oneQuestionRequest())).rejects.toThrow(
