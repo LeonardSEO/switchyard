@@ -67,6 +67,8 @@ export function mapOpenRouterModel(raw: OpenRouterModel): ModelCapabilities {
   const toolCalling = params.includes("tools");
   const structuredOutput = params.includes("structured_outputs") || params.includes("response_format");
   const reasoning = params.includes("reasoning") || params.includes("include_reasoning");
+  const outputModalities = raw.architecture?.output_modalities;
+  const textOutput = outputModalities ? outputModalities.includes("text") : undefined;
   const codingIndex = raw.benchmarks?.artificial_analysis?.coding_index;
   const capabilityScore = codingIndex === undefined ? undefined : codingIndex / 100;
 
@@ -91,6 +93,7 @@ export function mapOpenRouterModel(raw: OpenRouterModel): ModelCapabilities {
       structuredOutput,
       reasoning,
       reasoningEfforts: raw.reasoning?.supported_efforts,
+      textOutput,
     },
     maxContextTokens: raw.top_provider?.context_length ?? raw.context_length,
     strengths,

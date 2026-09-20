@@ -60,6 +60,23 @@ describe("openrouter mapping", () => {
     const noTools = mapOpenRouterModel({ id: "a/b", supported_parameters: ["max_tokens"] });
     expect(noTools.weaknesses).toContain("code-change");
   });
+
+  it("maps explicit output modalities without guessing when they are absent", () => {
+    const decisionOnly = mapOpenRouterModel({
+      ...rawModel,
+      id: "typesafe/jev-latest",
+      architecture: { output_modalities: ["decision"] },
+    });
+    const text = mapOpenRouterModel({
+      ...rawModel,
+      architecture: { output_modalities: ["text"] },
+    });
+    const unknown = mapOpenRouterModel(rawModel);
+
+    expect(decisionOnly.capabilities?.textOutput).toBe(false);
+    expect(text.capabilities?.textOutput).toBe(true);
+    expect(unknown.capabilities?.textOutput).toBeUndefined();
+  });
 });
 
 function memoryCache(initial?: CachedCatalog): CatalogCache & { value?: CachedCatalog } {

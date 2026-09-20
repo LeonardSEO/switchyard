@@ -292,6 +292,29 @@ describe("scoring", () => {
     const task = { objective: "summarize the notes", kind: "summarize" as const, maxCostUsd: 0.000001 };
     expect(filterCandidates(task, "summarize", "simple", [cheap, mid], {}).survivors).toHaveLength(0);
   });
+
+  it("rejects explicitly non-text models without rejecting unknown modality", () => {
+    const task = { objective: "summarize the notes", kind: "summarize" as const };
+    const decisionOnly = {
+      ...mid,
+      id: "typesafe/jev-latest",
+      capabilities: { ...mid.capabilities, textOutput: false },
+    } as ModelCapabilities;
+    const unknownModality = { ...mid, id: "legacy/unknown-output" };
+
+    const result = filterCandidates(
+      task,
+      "summarize",
+      "simple",
+      [decisionOnly, unknownModality],
+      {},
+    );
+
+    expect(result.survivors.map((model) => model.id)).toEqual(["legacy/unknown-output"]);
+    expect(result.pruned).toMatchObject([
+      { model: { id: "typesafe/jev-latest" }, reason: "no text output" },
+    ]);
+  });
 });
 
 describe("classifier", () => {

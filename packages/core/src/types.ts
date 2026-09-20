@@ -108,6 +108,8 @@ export interface ModelCapabilities {
     structuredOutput?: boolean;
     reasoning?: boolean;
     reasoningEfforts?: string[];
+    /** False only when the provider explicitly declares no text output. */
+    textOutput?: boolean;
   };
   /** Free or rate-limited variant: the price is a known zero, capacity is not. */
   freeTier?: boolean;

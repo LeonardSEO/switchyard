@@ -76,6 +76,7 @@ function rejectionReason(
   }
   // Batch endpoints answer hours later, not in the middle of a coding session.
   if (m.batchOnly && !task.allowBatch) return "async batch endpoint";
+  if (m.capabilities?.textOutput === false) return "no text output";
 
   const priceFloor = ctx.minPricePer1M ?? 0;
   if (priceFloor > 0 && m.pricing.inputPer1M.known && m.pricing.inputPer1M.value < priceFloor) {
