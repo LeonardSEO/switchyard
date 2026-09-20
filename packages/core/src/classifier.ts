@@ -24,12 +24,18 @@ import {
  *   - fall back to the deterministic answer on any failure.
  */
 
+export type DecisionFallbackReason =
+  | "low-confidence"
+  | "invalid-response"
+  | "unavailable"
+  | "cooldown";
+
 export interface Classification {
   kind: TaskKind;
   complexity: Complexity;
   /** 0..1. Deterministic classification is low-confidence by design. */
   confidence: number;
-  source: "explicit" | "keyword" | "model";
+  source: "explicit" | "keyword" | "model" | "jev";
   /** Keyword score, present for source "keyword". */
   score?: number;
   matched?: string[];
@@ -37,6 +43,12 @@ export interface Classification {
   degraded?: boolean;
   /** Cost of the classification call, USD, when a model was used. */
   costUsd?: number;
+  /** Resolved classifier model identifier returned by the provider. */
+  classifierModel?: string;
+  /** Remote classifier whose failure caused this fallback result. */
+  fallbackFrom?: "jev";
+  /** Machine-readable reason the Jev result was not used. */
+  fallbackReason?: DecisionFallbackReason;
 }
 
 export interface Classifier {

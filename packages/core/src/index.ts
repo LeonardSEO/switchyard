@@ -4,6 +4,7 @@ export * from "./quota.js";
 export * from "./scorer.js";
 export * from "./filter.js";
 export * from "./classifier.js";
+export * from "./decision-classifier.js";
 export * from "./route.js";
 export * from "./pareto.js";
 export * from "./attribution.js";
