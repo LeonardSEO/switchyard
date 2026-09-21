@@ -2,6 +2,12 @@
 
 Notable changes to Switchyard are documented here.
 
+## 0.4.2 - 2026-09-21
+
+### Fixed
+
+- Use OpenRouter's `~typesafe/jev-latest` moving alias so Jev is called instead of immediately falling back to the chat classifier.
+
 ## 0.4.1 - 2026-09-20
 
 ### Fixed
