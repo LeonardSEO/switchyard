@@ -40,8 +40,8 @@ describe("classifier evaluation arguments", () => {
 
 describe("classifier evaluation records", () => {
   it("namespaces cache entries by schema, backend, model, and input", () => {
-    expect(classifierEvalCacheKey("jev", "typesafe/jev-latest", "same input"))
-      .not.toBe(classifierEvalCacheKey("chat", "typesafe/jev-latest", "same input"));
+    expect(classifierEvalCacheKey("jev", "~typesafe/jev-latest", "same input"))
+      .not.toBe(classifierEvalCacheKey("chat", "~typesafe/jev-latest", "same input"));
   });
 
   it("recovers the chat model from a namespaced cache for offline replay", () => {

@@ -64,7 +64,7 @@ describe("openrouter mapping", () => {
   it("maps explicit output modalities without guessing when they are absent", () => {
     const decisionOnly = mapOpenRouterModel({
       ...rawModel,
-      id: "typesafe/jev-latest",
+      id: "~typesafe/jev-latest",
       architecture: { output_modalities: ["decision"] },
     });
     const text = mapOpenRouterModel({

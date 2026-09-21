@@ -297,7 +297,7 @@ describe("scoring", () => {
     const task = { objective: "summarize the notes", kind: "summarize" as const };
     const decisionOnly = {
       ...mid,
-      id: "typesafe/jev-latest",
+      id: "~typesafe/jev-latest",
       capabilities: { ...mid.capabilities, textOutput: false },
     } as ModelCapabilities;
     const unknownModality = { ...mid, id: "legacy/unknown-output" };
@@ -312,7 +312,7 @@ describe("scoring", () => {
 
     expect(result.survivors.map((model) => model.id)).toEqual(["legacy/unknown-output"]);
     expect(result.pruned).toMatchObject([
-      { model: { id: "typesafe/jev-latest" }, reason: "no text output" },
+      { model: { id: "~typesafe/jev-latest" }, reason: "no text output" },
     ]);
   });
 });

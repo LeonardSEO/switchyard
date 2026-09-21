@@ -12,7 +12,7 @@ Notable changes to Switchyard are documented here.
 
 ### Added
 
-- Use `typesafe/jev-latest` through OpenRouter Decisions as the primary remote task classifier in Pi, OMP, OpenCode, and the standalone gateway.
+- Use `~typesafe/jev-latest` through OpenRouter Decisions as the primary remote task classifier in Pi, OMP, OpenCode, and the standalone gateway.
 - Add deterministic Jev, chat, and keyword classifier evaluation backends with a balanced 24-case English held-out corpus.
 - Support compatible Decisions endpoints through `SWITCHYARD_DECISIONS_BASE_URL`.
 

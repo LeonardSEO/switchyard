@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make `typesafe/jev-latest` the primary Switchyard task classifier through OpenRouter Decisions, with the existing chat classifier and local keyword classifier as ordered fallbacks.
+**Goal:** Make `~typesafe/jev-latest` the primary Switchyard task classifier through OpenRouter Decisions, with the existing chat classifier and local keyword classifier as ordered fallbacks.
 
 **Architecture:** Add a provider-independent `DecisionClassifier` to core and a single OpenRouter Decisions transport shared by Pi/OMP and the gateway. Preserve explicit `TaskSpec` fields and the existing escalation contract, validate every Jev answer before routing, cache only accepted decisions for six hours, and keep Jev out of the execution-model pool.
 
@@ -13,7 +13,7 @@
 ## Global Constraints
 
 - All source text, prompts, test descriptions, configuration names, error messages, and documentation added by this work must be English.
-- The default decision model must be the moving alias `typesafe/jev-latest`; do not resolve or persist a numbered version as configuration.
+- The default decision model must be the moving alias `~typesafe/jev-latest`; do not resolve or persist a numbered version as configuration.
 - Do not add a runtime dependency or call OpenRouter in automated tests.
 - Do not change the expected-cost scorer, reasoning-effort selection, tool handling, or execution-provider behavior.
 - Preserve user changes and do not edit generated files.
@@ -56,7 +56,7 @@
 it("uses an accepted Jev decision for missing task fields", async () => {
   const requests: DecisionRequest[] = [];
   const classifier = new DecisionClassifier({
-    model: "typesafe/jev-latest",
+    model: "~typesafe/jev-latest",
     decide: async (request) => {
       requests.push(request);
       return {
@@ -80,7 +80,7 @@ it("uses an accepted Jev decision for missing task fields", async () => {
       classifierModel: "typesafe/jev-1.13",
       costUsd: 0.000042,
     });
-  expect(requests[0].model).toBe("typesafe/jev-latest");
+  expect(requests[0].model).toBe("~typesafe/jev-latest");
 });
 ```
 
@@ -276,7 +276,7 @@ it("posts a Jev request to OpenRouter Decisions", async () => {
     expect.objectContaining({ method: "POST" }),
   );
   expect(JSON.parse(fetchFn.mock.calls[0][1].body as string).model)
-    .toBe("typesafe/jev-latest");
+    .toBe("~typesafe/jev-latest");
   expect(result).toMatchObject({ model: "typesafe/jev-1.13", costUsd: 0.00001 });
 });
 ```
@@ -288,7 +288,7 @@ it("posts a Jev request to OpenRouter Decisions", async () => {
 - [ ] Implement these options without adding dependencies:
 
 ```ts
-export const OPENROUTER_JEV_LATEST = "typesafe/jev-latest";
+export const OPENROUTER_JEV_LATEST = "~typesafe/jev-latest";
 
 export interface ResolvedOpenRouterAuth {
   apiKey?: string;
@@ -510,7 +510,7 @@ npm run eval:classifier -- --backend jev --heldout --live
 
 - [ ] Update the privacy section to state that the bounded objective and compact project profile are sent through OpenRouter to the Jev provider during default remote classification. Retain the 4,000/16,000-character limits and `projectContext: "none"` / `escalation: "never"` opt-outs.
 
-- [ ] Add an operational note that OpenRouter Decisions is an alpha API, `typesafe/jev-latest` is a moving alias, and Switchyard validates output and retains two fallbacks rather than treating a typed answer as guaranteed correct.
+- [ ] Add an operational note that OpenRouter Decisions is an alpha API, `~typesafe/jev-latest` is a moving alias, and Switchyard validates output and retains two fallbacks rather than treating a typed answer as guaranteed correct.
 
 - [ ] State that Jev classifies tasks only; it is never selected to execute code, call tools, or replace the agent loop.
 

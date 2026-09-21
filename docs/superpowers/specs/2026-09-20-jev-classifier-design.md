@@ -4,7 +4,7 @@
 
 **Date:** 2026-09-20
 
-**Scope:** Replace Switchyard's default remote task-classification path with OpenRouter Decisions using `typesafe/jev-latest`, while preserving explicit task constraints and the existing offline behavior.
+**Scope:** Replace Switchyard's default remote task-classification path with OpenRouter Decisions using `~typesafe/jev-latest`, while preserving explicit task constraints and the existing offline behavior.
 
 ## Objective
 
@@ -24,7 +24,7 @@ local keyword classifier
 
 ## Constraints
 
-- Use the moving OpenRouter model alias `typesafe/jev-latest`; do not pin a numbered Jev release by default.
+- Use the moving OpenRouter model alias `~typesafe/jev-latest`; do not pin a numbered Jev release by default.
 - Call OpenRouter's Decisions endpoint, not `/chat/completions`.
 - Keep all prompts, criteria, identifiers, configuration text, documentation, and tests in English.
 - Preserve `TaskSpec.kind` and `TaskSpec.complexity` as authoritative user or host constraints.
@@ -50,7 +50,7 @@ Add a provider-independent `DecisionClassifier` in `packages/core`. It implement
 - bounded successful-decision caching;
 - Jev-to-chat fallback orchestration.
 
-The OpenRouter package owns the network transport and the `typesafe/jev-latest` default model identifier. This keeps OpenRouter authentication, URL construction, attribution headers, timeouts, and HTTP error handling out of the core package.
+The OpenRouter package owns the network transport and the `~typesafe/jev-latest` default model identifier. This keeps OpenRouter authentication, URL construction, attribution headers, timeouts, and HTTP error handling out of the core package.
 
 ### Decision request
 
@@ -89,7 +89,7 @@ A successful Jev classification reports:
 ```ts
 {
   source: "jev",
-  classifierModel: "typesafe/jev-latest", // or the resolved model returned by OpenRouter
+  classifierModel: "~typesafe/jev-latest", // or the resolved model returned by OpenRouter
   kind,
   complexity,
   confidence,
@@ -125,7 +125,7 @@ The request body contains:
 
 ```json
 {
-  "model": "typesafe/jev-latest",
+  "model": "~typesafe/jev-latest",
   "state": {
     "objective": "...",
     "project_context": "..."
@@ -149,7 +149,7 @@ The transport uses the same OpenRouter bearer token and application attribution 
 
 ### Adapter integration
 
-Pi and OMP build the current `ModelClassifier` as the fallback classifier, then wrap it in `DecisionClassifier`. `classifierModel` continues to pin the fallback chat classifier; it does not replace `typesafe/jev-latest`. The existing OpenRouter credential resolution is extracted and shared by the chat and Decisions transports.
+Pi and OMP build the current `ModelClassifier` as the fallback classifier, then wrap it in `DecisionClassifier`. `classifierModel` continues to pin the fallback chat classifier; it does not replace `~typesafe/jev-latest`. The existing OpenRouter credential resolution is extracted and shared by the chat and Decisions transports.
 
 The gateway uses the same composition. It accepts an injectable `decisionFn` for tests and `SWITCHYARD_DECISIONS_BASE_URL` for a compatible custom Decisions endpoint. No user configuration is required for the default Jev-first path.
 
@@ -201,7 +201,7 @@ The implementation must never log authorization headers, API keys, or full upstr
 
 ## Acceptance Criteria
 
-- Default remote classification uses `typesafe/jev-latest` through OpenRouter Decisions.
+- Default remote classification uses `~typesafe/jev-latest` through OpenRouter Decisions.
 - Explicit `TaskSpec` dimensions are never overwritten.
 - The fallback chain is Jev, existing chat classifier, then local keyword classifier.
 - `escalation: "never"` performs no remote classification call.

@@ -5,7 +5,7 @@ import {
   type DecisionResponse,
 } from "@vepando/switchyard-core";
 
-export const OPENROUTER_JEV_LATEST = "typesafe/jev-latest";
+export const OPENROUTER_JEV_LATEST = "~typesafe/jev-latest";
 
 const DEFAULT_DECISIONS_URL = "https://openrouter.ai/api/alpha/decisions";
 

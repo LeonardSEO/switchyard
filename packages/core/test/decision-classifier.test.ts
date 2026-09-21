@@ -58,7 +58,7 @@ function createClassifier(
 ): DecisionClassifier {
   const decide: DecisionFn = async (request) => responseFor(request);
   return new DecisionClassifier({
-    model: "typesafe/jev-latest",
+    model: "~typesafe/jev-latest",
     decide,
     fallback: fixedClassifier({
       kind: "debug",
@@ -74,7 +74,7 @@ describe("DecisionClassifier", () => {
   it("uses an accepted Jev decision for missing task fields", async () => {
     const requests: DecisionRequest[] = [];
     const classifier = new DecisionClassifier({
-      model: "typesafe/jev-latest",
+      model: "~typesafe/jev-latest",
       decide: async (request) => {
         requests.push(request);
         return {
@@ -99,7 +99,7 @@ describe("DecisionClassifier", () => {
       classifierModel: "typesafe/jev-1.13",
       costUsd: 0.000042,
     });
-    expect(requests[0]?.model).toBe("typesafe/jev-latest");
+    expect(requests[0]?.model).toBe("~typesafe/jev-latest");
   });
 
   it.each([

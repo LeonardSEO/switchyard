@@ -97,7 +97,7 @@ Use `http://127.0.0.1:8787/v1` as the OpenAI-compatible base URL and select `swi
 request + compact project context -> explicit constraints -> Jev -> chat fallback -> local fallback -> filter -> score expected cost -> select model + effort
 ```
 
-By default, Switchyard asks [`typesafe/jev-latest`](https://openrouter.ai/~typesafe/jev-latest)
+By default, Switchyard asks [`~typesafe/jev-latest`](https://openrouter.ai/~typesafe/jev-latest)
 to classify the task kind and complexity through OpenRouter Decisions. Explicit
 caller constraints still win. A malformed, unavailable, or low-confidence Jev
 answer falls back to the existing chat classifier and then to the local keyword
@@ -189,7 +189,7 @@ for the actual completion.
 
 Set `escalation: "never"` to disable model-based classification. Credentials remain in the host or environment and are not written into Switchyard configuration. Please report vulnerabilities privately as described in [SECURITY.md](SECURITY.md).
 
-OpenRouter Decisions is an alpha API, and `typesafe/jev-latest` is a moving
+OpenRouter Decisions is an alpha API, and `~typesafe/jev-latest` is a moving
 alias. Switchyard validates every returned answer and keeps both chat and local
 fallbacks; a typed response is not treated as a guarantee that the
 classification is correct. For protocol details, see the

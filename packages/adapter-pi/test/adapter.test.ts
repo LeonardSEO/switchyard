@@ -661,7 +661,7 @@ describe("Jev-first classification", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]?.url).toBe("https://openrouter.ai/api/alpha/decisions");
     expect(requests[0]?.headers.authorization).toBe("Bearer pi-key");
-    expect(JSON.parse(requests[0]?.body ?? "{}").model).toBe("typesafe/jev-latest");
+    expect(JSON.parse(requests[0]?.body ?? "{}").model).toBe("~typesafe/jev-latest");
   });
 
   it("uses the pinned classifier model only for the chat fallback", async () => {
@@ -683,7 +683,7 @@ describe("Jev-first classification", () => {
     }
 
     expect(bodies).toHaveLength(2);
-    expect((bodies[0] as { model: string }).model).toBe("typesafe/jev-latest");
+    expect((bodies[0] as { model: string }).model).toBe("~typesafe/jev-latest");
     expect((bodies[1] as { model: string }).model).toBe("alternate/classifier");
   });
 
@@ -1020,7 +1020,7 @@ describe("escalation policy", () => {
       globalThis.fetch = originalFetch;
     }
     expect(called).toBe(1);
-    expect(captured.body).toContain("typesafe/jev-latest");
+    expect(captured.body).toContain("~typesafe/jev-latest");
   });
 });
 

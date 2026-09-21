@@ -61,7 +61,7 @@ describe("OpenRouter Decisions transport", () => {
       expect.objectContaining({ method: "POST" }),
     );
     const init = fetchFn.mock.calls[0]?.[1] as RequestInit;
-    expect(JSON.parse(String(init.body)).model).toBe("typesafe/jev-latest");
+    expect(JSON.parse(String(init.body)).model).toBe("~typesafe/jev-latest");
     expect(result).toMatchObject({
       model: "typesafe/jev-1.13-20260917",
       costUsd: 0.00001,
